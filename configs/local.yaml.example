@@ -1,0 +1,17 @@
+# Example local config — copy to config.local.yaml and customize
+# (config.local.yaml is gitignored)
+
+# Big data disk
+data_dir: ~/minimax-work/data
+
+# Where to find the InfiniTensor Python bindings
+infinitensor_python_path: ~/minimax-work/InfiniTensor/pyinfinitensor/src
+
+# Size cap for collected models (bytes). Smaller = faster collection.
+max_model_size_bytes: 83886080  # 80 MB
+
+# Test backend
+backend: cuda  # or cpu
+
+# Use the bundled onnxruntime for correctness comparison
+reference_runtime: onnxruntime

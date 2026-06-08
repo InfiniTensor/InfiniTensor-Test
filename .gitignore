@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Virtual env
+venv/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Test artifacts (large)
+data/models/
+data/cache/
+data/results/
+data/reports/
+*.log
+
+# Model files (NEVER commit)
+*.onnx
+*.onnx.data
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.pb
+*.h5
+*.tflite
+
+# Local config
+.env
+.env.local
+config.local.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+*.tar.gz
+*.zip
+*.tar

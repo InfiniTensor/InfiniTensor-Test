@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "infinitensor-test"
+version = "0.1.0"
+description = "Integration test suite for InfiniTensor deep learning compiler"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "InfiniTensor Test Team" }]
+
+dependencies = [
+    "numpy>=1.20",
+    "onnx>=1.13",
+    "onnxruntime>=1.14",
+    "pyyaml>=6.0",
+    "tqdm>=4.64",
+    "tabulate>=0.9",
+    "matplotlib>=3.5",
+]
+
+[project.optional-dependencies]
+full = [
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "timm>=0.9",
+    "huggingface_hub>=0.16",
+    "pandas>=1.4",
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-xdist>=3.0",
+    "pytest-benchmark>=4.0",
+]
+
+[project.scripts]
+infinitensor-test-collect = "infinitensor_test.scripts.collect:main"
+infinitensor-test-run = "infinitensor_test.scripts.run:main"
+infinitensor-test-report = "infinitensor_test.scripts.report:main"
+infinitensor-test-compare = "infinitensor_test.scripts.compare:main"
+infinitensor-test-ops-collect = "infinitensor_test.operators.scripts.ops_collect:main"
+infinitensor-test-ops-run = "infinitensor_test.operators.scripts.ops_run:main"
+infinitensor-test-ops-report = "infinitensor_test.operators.scripts.ops_report:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+infinitensor_test = ["configs/*.yaml", "configs/*.yml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--tb=short",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: integration tests with real models",
+    "performance: performance benchmarks",
+    "regression: regression tests",
+    "correctness: correctness vs onnxruntime",
+    "coverage: coverage tests",
+    "ci: tests suitable for CI (fast)",
+]
+
+[tool.coverage.run]
+source = ["infinitensor_test"]
+omit = ["*/tests/*", "*/scripts/*"]

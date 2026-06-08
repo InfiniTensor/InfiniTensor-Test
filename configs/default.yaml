@@ -1,0 +1,24 @@
+# Default configuration for InfiniTensor-Test
+# Override any of these in config.local.yaml (which is gitignored).
+
+# Use absolute paths so the suite works regardless of cwd.
+data_dir: ~/minimax-work/data
+models_dir: ~/minimax-work/data/models
+results_dir: ~/minimax-work/data/results
+reports_dir: ~/minimax-work/data/reports
+
+# Where to find the InfiniTensor Python bindings (built locally)
+infinitensor_python_path: ~/minimax-work/InfiniTensor/pyinfinitensor/src
+env_script: /tmp/infinitensor.env
+venv_path: ~/minimax-work/venv
+
+# Skip models larger than 80MB when collecting
+max_model_size_bytes: 83886080  # 80 MB
+
+backend: cuda
+default_suite: smoke
+num_workers: 1
+random_seed: 42
+inference_timeout_s: 60
+reference_runtime: onnxruntime
+network_enabled: true
