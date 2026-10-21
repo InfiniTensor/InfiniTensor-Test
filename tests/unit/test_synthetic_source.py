@@ -7,6 +7,7 @@ without needing InfiniTensor.
 from __future__ import annotations
 
 import io
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -18,7 +19,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from infinitensor_test.models.registry import get_source  # noqa: E402
+from infinitensor_test.models.registry import get_source, OptionalDependencyError  # noqa: E402
 from infinitensor_test.models.spec import ModelSource, ModelCategory  # noqa: E402
 from infinitensor_test.models import sources as _sources  # noqa: E402, F401
 
@@ -72,7 +73,11 @@ def test_synthetic_categories_present():
 
 
 def test_synthetic_torchvision_smoke():
-    """A small torchvision classifier spec should produce an ONNX model."""
+    """Discover installed torchvision or report its missing extra explicitly."""
+    if importlib.util.find_spec("torchvision") is None:
+        with pytest.raises(OptionalDependencyError, match=r"infinitensor-test\[torchvision\]"):
+            get_source("torchvision")
+        return
     fn = get_source("torchvision")
     specs = fn({})
     # Take the first torchvision spec

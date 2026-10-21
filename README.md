@@ -1,5 +1,10 @@
 # InfiniTensor-Test
 
+This branch implements T01: lazy model sources, deterministic collection and
+validated transactional ONNX packages. See the [scope and reproducible commands](docs/pr-t01-collection.md)
+and [PR review notes](docs/pr-t01-review.md). Device execution and numerical gating
+are delivered in the subsequent PRs.
+
 > Integration test suite for the [InfiniTensor](https://github.com/InfiniTensor/InfiniTensor) deep learning compiler.
 
 **Languages:** [English](README.md) · [简体中文](README.zh-CN.md)

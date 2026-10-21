@@ -28,6 +28,7 @@ There are several "block" sources so they can be selected independently:
 from __future__ import annotations
 
 import itertools
+import hashlib
 from pathlib import Path
 from typing import List
 
@@ -40,7 +41,14 @@ from infinitensor_test.models.spec import (
     ModelCategory,
     ModelSource,
 )
-from infinitensor_test.models.registry import register_source
+from infinitensor_test.models.registry import register_source, SOURCE_SEED
+from infinitensor_test.artifacts import digest, stable_seed
+
+
+def _random(shape, case_id, parameter):
+    """One RNG per case/parameter; aliases and discovery order have no effect."""
+    identity = f"synthetic:synth_{case_id}:{parameter}"
+    return np.random.default_rng(stable_seed(SOURCE_SEED.get(), identity)).random(shape)
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +69,9 @@ def _save_model(name: str, nodes, inits, in_shape, out_shape) -> onnx.ModelProto
         [output_info],
         inits,
     )
-    return helper.make_model(graph, opset_imports=[helper.make_opsetid("", 18)])
+    # Use the IR required by our opset instead of the installed ONNX release's
+    # newest IR, which may not yet be supported by ONNX Runtime.
+    return helper.make_model_gen_version(graph, opset_imports=[helper.make_opsetid("", 18)])
 
 
 def _t(arr, name):
@@ -131,7 +141,7 @@ def _elementwise_specs() -> List[ModelSpec]:
     out: List[ModelSpec] = []
     for op in ["Add", "Sub", "Mul", "Div", "Pow", "Max", "Min", "Mean"]:
         for in_s in [(1, 8, 8), (1, 16, 16), (1, 32, 32), (1, 64, 64)]:
-            c = (np.random.random(in_s) * 0.1 + 0.5).astype(np.float32)
+            c = (_random(in_s, f"{op}_{in_s}", "c") * 0.1 + 0.5).astype(np.float32)
             inits = [_t(c, "c")]
             nodes = [helper.make_node(op, ["x", "c"], ["y"])]
             out.append(_spec(f"{op}_{in_s}", in_s, None, inits, nodes, ModelCategory.ELEMENTWISE))
@@ -158,8 +168,9 @@ def _matmul_specs() -> List[ModelSpec]:
         (128, 128, 128), (16, 32, 16), (8, 8, 16),
     ]
     for m, k, n_dim in shapes:
-        w = (np.random.random([k, n_dim]) * 0.1).astype(np.float32)
-        b = (np.random.random(n_dim) * 0.1).astype(np.float32)
+        case = f"matmul_{m}x{k}x{n_dim}_in_{(1, m)}"
+        w = (_random([k, n_dim], case, "w") * 0.1).astype(np.float32)
+        b = (_random(n_dim, case, "b") * 0.1).astype(np.float32)
         inits = [_t(w, "w"), _t(b, "b")]
         nodes = [
             helper.make_node("MatMul", ["x", "w"], ["mm"]),
@@ -168,7 +179,7 @@ def _matmul_specs() -> List[ModelSpec]:
         out.append(_spec(f"matmul_{m}x{k}x{n_dim}_in_{(1, m)}", [1, m], [1, n_dim], inits, nodes, ModelCategory.MLP))
     # Gemm with various alpha/beta/transB
     for alpha, beta, transB in [(1.0, 1.0, 0), (0.5, 0.5, 1), (2.0, 0.0, 0), (1.0, 1.0, 1)]:
-        w = (np.random.random([8, 8]) * 0.1).astype(np.float32)
+        w = (_random([8, 8], f"gemm_a{alpha}_b{beta}_t{transB}", "w") * 0.1).astype(np.float32)
         b = np.zeros(8, dtype=np.float32)
         inits = [_t(w, "w"), _t(b, "b")]
         nodes = [helper.make_node("Gemm", ["x", "w", "b"], ["y"],
@@ -276,8 +287,8 @@ def _slice_specs() -> List[ModelSpec]:
         out.append(_spec(f"gather_{in_s}", in_s, None, inits, nodes, ModelCategory.SHAPE_OPS))
     for axis in [0, 1, 2, 3]:
         for in_s in [(1, 4, 8, 8), (1, 8, 8, 8), (1, 16, 16, 16)]:
-            c1 = (np.random.random(in_s) * 0.1).astype(np.float32)
-            c2 = (np.random.random(in_s) * 0.1).astype(np.float32)
+            c1 = (_random(in_s, f"concat_a{axis}_{in_s}", "c1") * 0.1).astype(np.float32)
+            c2 = (_random(in_s, f"concat_a{axis}_{in_s}", "c2") * 0.1).astype(np.float32)
             inits = [_t(c1, "c1"), _t(c2, "c2")]
             nodes = [helper.make_node("Concat", ["c1", "c2"], ["y"], axis=axis)]
             out.append(_spec(f"concat_a{axis}_{in_s}", in_s, None, inits, nodes, ModelCategory.SHAPE_OPS))
@@ -296,9 +307,9 @@ def _template_specs() -> List[ModelSpec]:
     out: List[ModelSpec] = []
     # VGG block
     for c1, c2 in [(4, 8), (8, 16), (16, 32), (32, 64)]:
-        w1 = (np.random.random([c1, 3, 3, 3]) * 0.1).astype(np.float32)
+        w1 = (_random([c1, 3, 3, 3], f"vggblock_{c1}_{c2}", "w1") * 0.1).astype(np.float32)
         b1 = np.zeros(c1, dtype=np.float32)
-        w2 = (np.random.random([c2, c1, 3, 3]) * 0.1).astype(np.float32)
+        w2 = (_random([c2, c1, 3, 3], f"vggblock_{c1}_{c2}", "w2") * 0.1).astype(np.float32)
         b2 = np.zeros(c2, dtype=np.float32)
         inits = [_t(w1, "w1"), _t(b1, "b1"), _t(w2, "w2"), _t(b2, "b2")]
         nodes = [
@@ -312,11 +323,11 @@ def _template_specs() -> List[ModelSpec]:
                           inits, nodes, ModelCategory.CNN_BLOCK))
     # ResBlock
     for c in [4, 8, 16, 32]:
-        w1 = (np.random.random([c, c, 3, 3]) * 0.05).astype(np.float32)
+        w1 = (_random([c, c, 3, 3], f"resblock_c{c}", "w1") * 0.05).astype(np.float32)
         b1 = np.zeros(c, dtype=np.float32)
-        w2 = (np.random.random([c, c, 3, 3]) * 0.05).astype(np.float32)
+        w2 = (_random([c, c, 3, 3], f"resblock_c{c}", "w2") * 0.05).astype(np.float32)
         b2 = np.zeros(c, dtype=np.float32)
-        s = (np.random.random(c) * 0.1 + 0.5).astype(np.float32)
+        s = (_random(c, f"resblock_c{c}", "scale") * 0.1 + 0.5).astype(np.float32)
         bo = np.zeros(c, dtype=np.float32)
         m = np.zeros(c, dtype=np.float32)
         v = np.ones(c, dtype=np.float32)
@@ -337,9 +348,9 @@ def _template_specs() -> List[ModelSpec]:
         out.append(_spec(f"resblock_c{c}", [1, c, 8, 8], None, inits, nodes, ModelCategory.CNN_BLOCK))
     # Inception
     for c in [4, 8, 16]:
-        w1 = (np.random.random([c, c, 1, 1]) * 0.1).astype(np.float32)
-        w3 = (np.random.random([c, c, 3, 3]) * 0.1).astype(np.float32)
-        w5 = (np.random.random([c, c, 5, 5]) * 0.1).astype(np.float32)
+        w1 = (_random([c, c, 1, 1], f"inception_c{c}", "w1") * 0.1).astype(np.float32)
+        w3 = (_random([c, c, 3, 3], f"inception_c{c}", "w3") * 0.1).astype(np.float32)
+        w5 = (_random([c, c, 5, 5], f"inception_c{c}", "w5") * 0.1).astype(np.float32)
         b = np.zeros(c, dtype=np.float32)
         inits = [_t(w1, "w1"), _t(b, "b1"), _t(w3, "w3"), _t(b, "b3"),
                  _t(w5, "w5"), _t(b, "b5")]
@@ -361,7 +372,7 @@ def _template_specs() -> List[ModelSpec]:
         nodes = []
         cur = "x"
         for i in range(depth):
-            w = (np.random.random([dim, dim if i > 0 else 8]) * 0.1).astype(np.float32)
+            w = (_random([dim, dim if i > 0 else 8], f"mlp_d{depth}_d{dim}", f"w{i}") * 0.1).astype(np.float32)
             b = np.zeros(dim, dtype=np.float32)
             inits += [_t(w, f"w{i}"), _t(b, f"b{i}")]
             nodes.append(helper.make_node("MatMul", [cur, f"w{i}"], [f"m{i}"]))
@@ -371,10 +382,10 @@ def _template_specs() -> List[ModelSpec]:
         out.append(_spec(f"mlp_d{depth}_d{dim}", [1, 8], None, inits, nodes, ModelCategory.MLP))
     # Attention block
     for d in [16, 32, 64]:
-        wq = (np.random.random([d, d]) * 0.05).astype(np.float32)
-        wk = (np.random.random([d, d]) * 0.05).astype(np.float32)
-        wv = (np.random.random([d, d]) * 0.05).astype(np.float32)
-        wo = (np.random.random([d, d]) * 0.05).astype(np.float32)
+        wq = (_random([d, d], f"attn_d{d}", "wq") * 0.05).astype(np.float32)
+        wk = (_random([d, d], f"attn_d{d}", "wk") * 0.05).astype(np.float32)
+        wv = (_random([d, d], f"attn_d{d}", "wv") * 0.05).astype(np.float32)
+        wo = (_random([d, d], f"attn_d{d}", "wo") * 0.05).astype(np.float32)
         b = np.zeros(d, dtype=np.float32)
         inits = [_t(wq, "wq"), _t(b, "bq"),
                  _t(wk, "wk"), _t(b, "bk"),
@@ -412,7 +423,7 @@ def _norm_specs() -> List[ModelSpec]:
             (3, [c, c]),
         ]
         for variant_idx, shape in ln_shapes:
-            scale = np.random.random([shape[-1]]).astype(np.float32)
+            scale = _random([shape[-1]], f"layernorm_c{c}_v{variant_idx}", "scale").astype(np.float32)
             bias = np.zeros([shape[-1]], dtype=np.float32)
             inits = [_t(scale, "s"), _t(bias, "b")]
             nodes = [helper.make_node("LayerNormalization", ["x", "s", "b"], ["y"],
@@ -420,7 +431,7 @@ def _norm_specs() -> List[ModelSpec]:
             out.append(_spec(f"layernorm_c{c}_v{variant_idx}", shape, None, inits, nodes, ModelCategory.NORM))
         # BatchNorm
         for variant_idx, shape in enumerate([[1, c, 8, 8], [1, c, 16, 16]]):
-            scale = (np.random.random(c) * 0.1 + 0.5).astype(np.float32)
+            scale = (_random(c, f"batchnorm_c{c}_v{variant_idx}", "scale") * 0.1 + 0.5).astype(np.float32)
             bias = np.zeros(c, dtype=np.float32)
             mean = np.zeros(c, dtype=np.float32)
             var = np.ones(c, dtype=np.float32)
@@ -429,7 +440,7 @@ def _norm_specs() -> List[ModelSpec]:
                                        epsilon=1e-5, momentum=0.9)]
             out.append(_spec(f"batchnorm_c{c}_v{variant_idx}", shape, None, inits, nodes, ModelCategory.NORM))
     for c in [4, 8]:
-        scale = np.random.random(c).astype(np.float32)
+        scale = _random(c, f"instnorm_c{c}_v0", "scale").astype(np.float32)
         bias = np.zeros(c, dtype=np.float32)
         inits = [_t(scale, "s"), _t(bias, "b")]
         nodes = [helper.make_node("InstanceNormalization", ["x", "s", "b"], ["y"], epsilon=1e-5)]
@@ -463,6 +474,14 @@ def _spec(name: str, in_shape, out_shape, inits, nodes, category: ModelCategory)
         input_shape=in_shape,
         tags=["synthetic", category.value],
         size_hint_bytes=0,
+        metadata={
+            "generator_version": 2,
+            "definition_sha256": digest({
+                "inputs": in_shape, "outputs": out_shape,
+                "nodes": [hashlib.sha256(n.SerializeToString()).hexdigest() for n in nodes],
+                "constants": [hashlib.sha256(t.SerializeToString()).hexdigest() for t in inits],
+            }),
+        },
     )
 
 

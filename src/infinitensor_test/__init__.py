@@ -13,7 +13,7 @@ for *end-to-end* validation of the compiler against diverse model inputs.
 
 Typical usage:
     # Collect a model suite (downloads/generates ONNX files, not committed)
-    infinitensor-test-collect --suite smoke --output data/models
+    infinitensor-test-collect --sources synthetic_activation --data-dir data
 
     # Run the suite
     infinitensor-test-run --suite smoke --mode all
@@ -27,8 +27,7 @@ from infinitensor_test.models.catalog import ModelCatalog
 from infinitensor_test.runner.result import TestResult
 from infinitensor_test.runner.engine import TestEngine
 
-# Importing sources registers them as a side effect
-from infinitensor_test.models import sources as _sources  # noqa: F401
+# Sources are discovered lazily; importing this package needs no model extras.
 
 __version__ = "0.1.0"
 

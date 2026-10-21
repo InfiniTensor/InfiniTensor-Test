@@ -8,6 +8,7 @@ optional (offline environments can skip it).
 from __future__ import annotations
 
 import os
+from pathlib import PurePosixPath
 from typing import List
 
 from infinitensor_test.models.spec import (
@@ -16,6 +17,7 @@ from infinitensor_test.models.spec import (
     ModelSource,
 )
 from infinitensor_test.models.registry import register_source
+from infinitensor_test.artifacts import external_locations
 
 
 # A small curated list (offline-friendly and diverse).
@@ -38,7 +40,17 @@ def huggingface_specs(params: dict) -> List[ModelSpec]:
     for repo_id, fname, name, category, shape in _HF_MODELS:
         def factory(r=repo_id, f=fname, n=name):
             from huggingface_hub import hf_hub_download
-            return ("file", hf_hub_download(repo_id=r, filename=f, local_files_only=False), n)
+            kwargs = {
+                "repo_id": r,
+                "local_files_only": not params.get("network_enabled", True),
+                "cache_dir": params.get("cache_dir"),
+                "revision": params.get("revision"),
+            }
+            path = hf_hub_download(filename=f, **kwargs)
+            for location in external_locations(path):
+                filename = (PurePosixPath(f).parent / location.as_posix()).as_posix()
+                hf_hub_download(filename=filename, **kwargs)
+            return ("file", path, n)
         spec = ModelSpec(
             name=name,
             source=ModelSource.HUGGINGFACE,

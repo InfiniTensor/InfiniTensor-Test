@@ -9,6 +9,7 @@ dist/
 *.egg-info/
 *.egg
 .pytest_cache/
+.validation/
 .coverage
 htmlcov/
 .mypy_cache/

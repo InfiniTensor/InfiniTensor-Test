@@ -7,6 +7,7 @@ Produces specs for `torchvision.models`. We use random weights
 from __future__ import annotations
 
 import warnings
+import inspect
 from typing import List
 
 import torch
@@ -25,6 +26,8 @@ def _safe_create(builder, name: str, **kwargs) -> nn.Module:
     """Create a model with weights=None. Suppress known deprecation noise."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
+        if "weights_backbone" in inspect.signature(builder).parameters:
+            kwargs.setdefault("weights_backbone", None)
         return builder(weights=None, **kwargs)
 
 
@@ -75,8 +78,8 @@ _TORCHVISION_CLASSIFIERS = [
 def _torchvision_specs() -> List[ModelSpec]:
     out: List[ModelSpec] = []
     for builder, name in _TORCHVISION_CLASSIFIERS:
-        def factory(b=builder):
-            return _safe_create(b, name)
+        def factory(b=builder, n=name):
+            return _safe_create(b, n)
         spec = ModelSpec(
             name=f"tv_{name}",
             source=ModelSource.TORCHVISION,
@@ -96,8 +99,8 @@ def _torchvision_detection_specs() -> List[ModelSpec]:
     out: List[ModelSpec] = []
     try:
         from torchvision.models.detection import ssdlite320_mobilenet_v3_large
-    except Exception as e:
-        return out
+    except ImportError as error:
+        raise RuntimeError("requested torchvision detection source is unavailable") from error
     def factory():
         return _safe_create(ssdlite320_mobilenet_v3_large, "ssdlite")
     out.append(ModelSpec(

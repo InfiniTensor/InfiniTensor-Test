@@ -1,5 +1,9 @@
 # InfiniTensor-Test
 
+本分支交付 T01：来源按需加载、确定性采集和完整 ONNX 包缓存。
+请先阅读[能力提升及复验命令](docs/pr-t01-collection.md)与[PR 审查说明](docs/pr-t01-review.md)。
+设备执行、全部输出数值比较和严格门禁由后续 PR 交付。
+
 > [InfiniTensor](https://github.com/InfiniTensor/InfiniTensor) 深度学习编译器的集成测试套件。
 
 **语言 / Languages:** [English](README.md) · [简体中文](README.zh-CN.md)

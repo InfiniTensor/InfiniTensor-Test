@@ -9,6 +9,9 @@ Each model is downloaded once and cached under `data/models/onnx_zoo/`.
 from __future__ import annotations
 
 import os
+from pathlib import Path
+import tempfile
+from urllib.parse import urljoin, quote
 import urllib.request
 from typing import List
 
@@ -18,6 +21,22 @@ from infinitensor_test.models.spec import (
     ModelSource,
 )
 from infinitensor_test.models.registry import register_source
+from infinitensor_test.artifacts import external_locations
+
+
+def _cached_download(url, target, network_enabled):
+    if target.is_file():
+        return
+    if not network_enabled:
+        raise RuntimeError(f"offline model file not cached: {target}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary = tempfile.mkstemp(prefix=".download-", dir=target.parent)
+    os.close(handle)
+    try:
+        urllib.request.urlretrieve(url, temporary)
+        os.replace(temporary, target)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
 
 
 # A small, reliable subset of the ONNX Model Zoo.
@@ -58,11 +77,13 @@ def onnx_zoo_specs(params: dict) -> List[ModelSpec]:
     for url, name, category, shape, tags in _ONNX_ZOO[:limit]:
         def factory(u=url, n=name):
             # download to local cache
-            cache_dir = os.path.expanduser("~/minimax-work/data/cache/onnx_zoo")
-            os.makedirs(cache_dir, exist_ok=True)
-            target = os.path.join(cache_dir, f"{n}.onnx")
-            if not os.path.exists(target):
-                urllib.request.urlretrieve(u, target)
+            cache_dir = Path(params.get("cache_dir", "data/cache")).expanduser() / "onnx_zoo" / n
+            target = cache_dir / "model.onnx"
+            network = params.get("network_enabled", True)
+            _cached_download(u, target, network)
+            for location in external_locations(target):
+                _cached_download(urljoin(u, quote(location.as_posix(), safe="/")),
+                                 target.parent / location, network)
             return ("file", target, n)
         spec = ModelSpec(
             name=f"zoo_{name}",
