@@ -1,72 +1,40 @@
-"""Configuration management for InfiniTensor tests.
-
-This module handles:
-- Default settings (paths, sizes, modes)
-- YAML config loading
-- Environment variable overrides
-- Path resolution (including the big-data disk)
-
-Configuration priority (highest first):
-  1. CLI argument overrides
-  2. Environment variables
-  3. Local YAML file (config.local.yaml)
-  4. Default values from DEFAULT_SETTINGS
-"""
+"""CLI > environment > YAML > defaults; loading never creates directories."""
 
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass
+import math
 import os
-from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import yaml
 
 
-DEFAULT_SETTINGS: Dict[str, Any] = {
-    # Data directory (the big disk the user mounted)
-    "data_dir": "~/minimax-work/data",
-    # Where ONNX models live
-    "models_dir": "data/models",
-    # Where test results go
-    "results_dir": "data/results",
-    # Where reports go
-    "reports_dir": "data/reports",
-    # InfiniTensor python bindings path
-    "infinitensor_python_path": "~/minimax-work/InfiniTensor/pyinfinitensor/src",
-    # Environment script (sets CUDA_HOME, etc.)
-    "env_script": "/tmp/infinitensor.env",
-    # Virtualenv with deps (torch, onnxruntime, etc.)
-    "venv_path": "~/minimax-work/venv",
-    # Max model file size in bytes (skip larger)
-    "max_model_size_bytes": 80 * 1024 * 1024,  # 80 MB
-    # Inference backend
-    "backend": "cuda",  # cpu | cuda
-    # Test mode: smoke, quick, full, custom
+DEFAULT_SETTINGS = {
+    "data_dir": "data",
+    "models_dir": None,
+    "results_dir": None,
+    "reports_dir": None,
+    "infinitensor_python_path": "../InfiniTensor/pyinfinitensor/src",
+    "env_script": None,
+    "venv_path": None,
+    "max_model_size_bytes": 80 * 1024 * 1024,
+    "backend": "cuda",
     "default_suite": "smoke",
-    # Number of parallel workers (1 = sequential)
     "num_workers": 1,
-    # Random seed for reproducibility
     "random_seed": 42,
-    # Inference timeout in seconds
-    "inference_timeout_s": 60,
-    # Memory limit for model loading (bytes, 0 = unlimited)
+    "inference_timeout_s": 60.0,
     "memory_limit_bytes": 0,
-    # Keep results from previous runs
     "keep_history": True,
-    # Maximum history runs to keep
     "max_history_runs": 20,
-    # Reference runtime for correctness
     "reference_runtime": "onnxruntime",
-    # Allow network access for downloads
     "network_enabled": True,
 }
 
 
 @dataclass
 class Settings:
-    """Resolved runtime settings."""
-
     data_dir: Path
     models_dir: Path
     results_dir: Path
@@ -87,134 +55,79 @@ class Settings:
     network_enabled: bool
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Settings":
-        """Build a Settings instance from a dict, expanding user paths."""
-
-        def _p(v: Any) -> Any:
-            if isinstance(v, str):
-                return Path(os.path.expanduser(v))
-            if isinstance(v, Path):
-                return Path(os.path.expanduser(str(v)))
-            return v
-
-        # Only path-like fields are pathified. Other string fields stay as strings.
-        _path_fields = {
-            "data_dir", "models_dir", "results_dir", "reports_dir",
-            "infinitensor_python_path", "env_script", "venv_path",
-        }
-        out = {}
-        for k, v in d.items():
-            if v is None:
-                continue
-            if k in _path_fields:
-                out[k] = _p(v)
-            else:
-                out[k] = v
-
-        # Compute model/results/reports from data_dir.
-        # If the user didn't set a subpath, or set a relative one, anchor it
-        # under data_dir (not cwd).  This avoids the classic "I set data_dir
-        # and the suite still can't find my catalog" bug.
-        if "data_dir" in out:
-            base = Path(os.path.expanduser(str(d.get("data_dir", DEFAULT_SETTINGS["data_dir"]))))
-            for k, default_subpath in (
-                ("models_dir", "models"),
-                ("results_dir", "results"),
-                ("reports_dir", "reports"),
-            ):
-                v = out.get(k)
-                if v is None:
-                    out[k] = base / default_subpath
-                else:
-                    vp = Path(os.path.expanduser(str(v)))
-                    if not vp.is_absolute():
-                        # Treat any relative path as "subpath of data_dir"
-                        out[k] = base / default_subpath
-                    # else: keep user's absolute path as-is
-
-        # Apply defaults for anything missing
-        for k, v in DEFAULT_SETTINGS.items():
-            out.setdefault(k, v)
-
-        return cls(**out)
+    def from_dict(cls, data: Dict[str, Any]) -> "Settings":
+        unknown = set(data) - set(DEFAULT_SETTINGS)
+        if unknown:
+            raise ValueError(f"unknown settings: {sorted(unknown)}")
+        values = {**DEFAULT_SETTINGS, **data}
+        base = Path(values["data_dir"]).expanduser().resolve()
+        values["data_dir"] = base
+        for key, subdir in (("models_dir", "models"), ("results_dir", "results"),
+                            ("reports_dir", "reports")):
+            path = Path(values[key] if values[key] is not None else subdir).expanduser()
+            values[key] = (path if path.is_absolute() else base / path).resolve()
+        for key in ("infinitensor_python_path", "env_script", "venv_path"):
+            if values[key] is not None:
+                values[key] = Path(values[key]).expanduser().resolve()
+        for key in ("network_enabled", "keep_history"):
+            if not isinstance(values[key], bool):
+                raise ValueError(f"{key} must be a boolean")
+        for key in ("max_model_size_bytes", "num_workers", "random_seed",
+                    "memory_limit_bytes", "max_history_runs"):
+            if isinstance(values[key], bool) or not isinstance(values[key], int):
+                raise ValueError(f"{key} must be an integer")
+            minimum = 1 if key in ("max_model_size_bytes", "num_workers") else 0
+            if values[key] < minimum:
+                raise ValueError(f"{key} must be >= {minimum}")
+        timeout = values["inference_timeout_s"]
+        if not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError("inference_timeout_s must be finite and positive")
+        return cls(**values)
 
     def to_dict(self) -> Dict[str, Any]:
-        d = asdict(self)
-        for k, v in d.items():
-            if isinstance(v, Path):
-                d[k] = str(v)
-        return d
+        return {k: str(v) if isinstance(v, Path) else v for k, v in asdict(self).items()}
 
     def ensure_dirs(self) -> None:
-        for p in (self.data_dir, self.models_dir, self.results_dir, self.reports_dir):
-            Path(p).mkdir(parents=True, exist_ok=True)
+        for path in (self.data_dir, self.models_dir, self.results_dir, self.reports_dir):
+            path.mkdir(parents=True, exist_ok=True)
 
 
-def _deep_merge(base: Dict, override: Dict) -> Dict:
-    """Deep merge override into base."""
-    out = dict(base)
-    for k, v in override.items():
-        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
-            out[k] = _deep_merge(out[k], v)
-        else:
-            out[k] = v
-    return out
+def _environment_value(key, raw):
+    default = DEFAULT_SETTINGS[key]
+    if isinstance(default, bool):
+        if raw.lower() not in ("true", "1", "yes", "on", "false", "0", "no", "off"):
+            raise ValueError(f"ITEST_{key.upper()} must be a boolean")
+        return raw.lower() in ("true", "1", "yes", "on")
+    if isinstance(default, int):
+        return int(raw)
+    if isinstance(default, float):
+        return float(raw)
+    return raw
 
 
-def load_settings(
-    config_path: Optional[Path] = None,
-    cli_overrides: Optional[Dict[str, Any]] = None,
-) -> Settings:
-    """Load settings with priority: cli > env > local > defaults."""
-    merged = dict(DEFAULT_SETTINGS)
-
-    # Local YAML
-    candidates = []
-    if config_path:
-        candidates.append(Path(config_path))
-    else:
-        candidates.append(Path("config.local.yaml"))
-    for c in candidates:
-        if c.exists():
-            with open(c) as f:
-                merged = _deep_merge(merged, yaml.safe_load(f) or {})
-            break
-
-    # Environment variable overrides (prefix ITEST_)
-    for k in list(merged.keys()):
-        env_key = f"ITEST_{k.upper()}"
-        env_val = os.environ.get(env_key)
-        if env_val is not None:
-            # Try to parse as int/float/bool
-            if isinstance(merged[k], bool):
-                merged[k] = env_val.lower() in ("1", "true", "yes", "on")
-            elif isinstance(merged[k], int):
-                try:
-                    merged[k] = int(env_val)
-                except ValueError:
-                    pass
-            elif isinstance(merged[k], float):
-                try:
-                    merged[k] = float(env_val)
-                except ValueError:
-                    pass
-            else:
-                merged[k] = env_val
-
-    # CLI overrides (highest priority)
-    if cli_overrides:
-        for k, v in cli_overrides.items():
-            if v is not None:
-                merged[k] = v
-
-    return Settings.from_dict(merged)
+def load_settings(config_path=None, cli_overrides=None) -> Settings:
+    path = Path(config_path).expanduser() if config_path else Path("config.local.yaml")
+    if config_path and not path.is_file():
+        raise ValueError(f"config file does not exist: {path}")
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    data = {} if data is None else data
+    if not isinstance(data, dict):
+        raise ValueError("configuration must be a YAML mapping")
+    data = dict(data)
+    for key in DEFAULT_SETTINGS:
+        raw = os.environ.get("ITEST_" + key.upper())
+        if raw is not None:
+            data[key] = _environment_value(key, raw)
+    data.update({k: v for k, v in (cli_overrides or {}).items() if v is not None})
+    result = Settings.from_dict(data)
+    result._explicit = set(data)
+    return result
 
 
-# Lazy singleton
-_cached: Optional[Settings] = None
+_cached = None
 
 
-def get_settings(reload: bool = False) -> Settings:
+def get_settings(reload=False) -> Settings:
     global _cached
     if _cached is None or reload:
         _cached = load_settings()

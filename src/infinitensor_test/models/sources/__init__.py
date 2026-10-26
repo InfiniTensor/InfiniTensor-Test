@@ -1,23 +1,4 @@
-"""Model source plugins.
+"""Sources are loaded on demand by models.registry.get_source.
 
-Each submodule in this package registers one or more model sources. To add
-a new source, write a function decorated with `@register_source(...)` and
-import the module below.
+Package imports and source listings never import optional model libraries.
 """
-
-# Importing the modules registers them as a side effect.
-from infinitensor_test.models.sources import (
-    torchvision_source,
-    timm_source,
-    synthetic_source,
-    huggingface_source,
-    onnx_zoo_source,
-)
-
-__all__ = [
-    "torchvision_source",
-    "timm_source",
-    "synthetic_source",
-    "huggingface_source",
-    "onnx_zoo_source",
-]

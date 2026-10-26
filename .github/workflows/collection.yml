@@ -1,0 +1,38 @@
+name: Collection foundation
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  collection:
+    name: Base installation / Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.9', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e '.[test]'
+      - run: python -m pytest tests/unit tests/operators -q --junitxml=.validation/unit.xml
+      - name: Validate and reuse all positive and negative fixtures offline
+        run: |
+          infinitensor-test-collect --sources synthetic_full --offline --data-dir .validation/ci
+          infinitensor-test-collect --sources synthetic_full --offline --data-dir .validation/ci
+          python -c "from pathlib import Path; from infinitensor_test.models.catalog import ModelCatalog; c=ModelCatalog.load(Path('.validation/ci/models')); assert len(c)==566; assert len(c.filter())==548; assert c.stats()['negative_rejected']==18; assert all(s.metadata['cache_hit'] for s in c)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: collection-evidence-python-${{ matrix.python }}
+          include-hidden-files: true
+          path: |
+            .validation/unit.xml
+            .validation/ci/models/catalog.json

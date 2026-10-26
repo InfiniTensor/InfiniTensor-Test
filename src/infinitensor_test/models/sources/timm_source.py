@@ -71,10 +71,7 @@ def _make_timm_specs(
     max_size_mb: int = 80,
 ) -> List[ModelSpec]:
     """Build specs for all matching timm models."""
-    try:
-        import timm
-    except ImportError as e:
-        return []  # silently skip if timm is not installed
+    import timm
 
     skip_patterns = list(skip_patterns or _DEFAULT_SKIP)
     specs: List[ModelSpec] = []

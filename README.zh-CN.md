@@ -1,5 +1,10 @@
 # InfiniTensor-Test
 
+本分支合并采集基础与模型有效性修复：来源按需加载、确定性完整包缓存，
+以及 548 个合成正例的 ONNX 检查和 CPU 参考执行、18 个明确负例的按原因拒绝验证。
+请先阅读[能力提升及复验命令](docs/pr-t01-collection.md)与[PR 审查说明](docs/pr-t01-review.md)。
+设备执行、全部输出数值比较和严格门禁由后续 PR 交付。
+
 > [InfiniTensor](https://github.com/InfiniTensor/InfiniTensor) 深度学习编译器的集成测试套件。
 
 **语言 / Languages:** [English](README.md) · [简体中文](README.zh-CN.md)

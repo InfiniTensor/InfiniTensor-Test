@@ -99,6 +99,10 @@ class SubprocessTestEngine:
             f.write(_WORKER_SCRIPT)
 
     def run_one(self, spec, suite=None):
+        if spec.expected_rejection:
+            return TestResult(uuid.uuid4().hex[:16], spec.name, spec.source.value,
+                              spec.category.value, str(spec.path or ""), spec.size_hint_bytes,
+                              TestStatus.SKIP, error_message="negative fixture; collection validation only")
         run_id = uuid.uuid4().hex[:16]
         spec_data = {
             "name": spec.name, "source": spec.source.value,
@@ -155,7 +159,7 @@ class SubprocessTestEngine:
         run_id = uuid.uuid4().hex[:12]
         started_at = time.time()
         results = []
-        specs = list(catalog.specs)
+        specs = [spec for spec in catalog.specs if not spec.expected_rejection]
         if limit: specs = specs[:limit]
         n = len(specs)
         for i, spec in enumerate(specs):

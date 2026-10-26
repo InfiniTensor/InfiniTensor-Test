@@ -1,261 +1,263 @@
-"""Model collector: turn ModelSpecs into ONNX files on disk.
+"""Stage and validate complete ONNX packages, then atomically publish a pointer.
 
-The collector:
-
-1. Resolves the spec's `factory` (or uses `path` if already materialized)
-2. Invokes the factory to get a model (torch.nn.Module, onnx ModelProto, or
-   pre-existing file path)
-3. Exports / copies to `models_dir/<source>/<name>.onnx`
-4. Records the actual file size on the spec
-5. Marks the spec as skipped with a reason if anything fails
-
-The collector is **idempotent**: if the ONNX file already exists at the
-expected path with a size under `max_model_size_bytes`, it is reused.
+Published generations are immutable. Failed or interrupted exports cannot
+replace the last valid package. No exporter cleans a shared model directory.
+Every positive package must pass ONNX checks and CPU reference execution.
 """
 
-from __future__ import annotations
-
-import contextlib
+from contextlib import contextmanager, redirect_stdout
 import io
-import logging
+import json
+from pathlib import Path
+import random
+import re
 import shutil
 import sys
+import tempfile
 import time
-import traceback
-from pathlib import Path
-from typing import List, Optional, Iterable, Dict, Any
 
+import numpy as np
 import onnx
-import torch
+import onnxruntime as ort
 
-from infinitensor_test.config import Settings
-from infinitensor_test.models.spec import (
-    ModelSpec,
-    ModelSource,
-)
+from infinitensor_test.artifacts import atomic_json, copy_package, digest, model_manifest, stable_seed
 from infinitensor_test.models.catalog import ModelCatalog
+from infinitensor_test.models.registry import OptionalDependencyError
+from infinitensor_test.models.validation import (ModelValidationError, input_file_digest,
+                                                 validate_reference)
 
 
-log = logging.getLogger(__name__)
+# Bump when export/validation policy changes. Unversioned legacy caches are
+# deliberately never reused. Synthetic generators carry a separate version.
+GENERATOR_VERSION = 2
 
 
-# Words in model names that hint at "too large to materialize" — these are
-# filtered out before any export work, since their ONNX would be > 100MB.
-_LARGE_HINTS = (
-    "large", "huge", "giant", "xlarge", "xxl",
-    "1b", "3b", "6b", "7b", "13b", "22k", "21k", "in22k", "in21k",
-)
-
-
-def _is_too_big_name(name: str) -> bool:
-    n = name.lower()
-    return any(h in n for h in _LARGE_HINTS)
-
-
-def _export_torch_to_onnx(model: torch.nn.Module, dst: Path, input_shape) -> bool:
-    """Export a torch model to ONNX. Returns True on success."""
-    import warnings
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        # Resolve dynamic shape dims (set to 1)
-        fixed = [d if d > 0 else 1 for d in input_shape]
-        dummy = torch.randn(*fixed)
-        model.eval()
-        try:
-            torch.onnx.export(
-                model, dummy, str(dst),
-                opset_version=18, dynamo=False, verbose=False,
-                input_names=["x"], output_names=["y"],
-            )
-        except Exception as e:
-            log.debug(f"torch export failed: {e}")
-            return False
-    # Cleanup leftover files
-    for pat in ["onnx__*", "*.onnx.data"]:
-        for p in dst.parent.glob(pat):
-            try:
-                p.unlink()
-            except OSError:
-                pass
-    return dst.exists() and dst.stat().st_size > 0
-
-
-@contextlib.contextmanager
-def _suppress_stdout():
-    """Some libraries are very chatty during export."""
-    saved = sys.stdout
-    sys.stdout = io.StringIO()
+@contextmanager
+def factory_seed(spec, seed):
+    value = stable_seed(seed, spec.short_id())
+    numpy_state, python_state = np.random.get_state(), random.getstate()
+    np.random.seed(value)
+    random.seed(value)
     try:
-        yield
+        torch = sys.modules.get("torch")
+        if spec.source.value in ("torchvision", "timm") and torch is None:
+            import torch
+        if torch is not None:
+            with torch.random.fork_rng(devices=[]):
+                torch.random.default_generator.manual_seed(value)
+                yield
+        else:
+            yield
     finally:
-        sys.stdout = saved
+        np.random.set_state(numpy_state)
+        random.setstate(python_state)
 
 
-def _materialize_one(
-    spec: ModelSpec,
-    models_dir: Path,
-    max_size_bytes: int,
-    force: bool = False,
-) -> bool:
-    """Materialize a single spec to disk. Returns True if file is on disk."""
-    # Decide where to put the file
-    sub = Path(spec.source.value)
-    dst_dir = models_dir / sub
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / f"{spec.name}.onnx"
+def validate_model(path, spec=None, seed=42):
+    # Check paths/existence before ONNX follows external references.
+    manifest = model_manifest(path)
+    return manifest, validate_reference(path, spec, seed)
 
-    # If file already exists and is small enough, reuse
-    if dst.exists() and not force:
-        if dst.stat().st_size <= max_size_bytes:
-            spec.path = dst
-            spec.size_hint_bytes = dst.stat().st_size
-            return True
-        else:
-            # Too big - skip
-            dst.unlink()
-            spec.skip_reason = f"existing file too large ({dst.stat().st_size} bytes)"
-            return False
 
-    # If spec is pre-materialized (path set, no factory), just link/copy
-    if spec.path and spec.path.exists() and not spec.factory:
-        if spec.path.resolve() == dst.resolve():
-            spec.path = dst
-            spec.size_hint_bytes = dst.stat().st_size
-            return True
-        try:
-            shutil.copy(spec.path, dst)
-        except shutil.SameFileError:
-            pass
-        spec.path = dst
-        spec.size_hint_bytes = dst.stat().st_size
-        return True
-
-    if spec.factory is None:
-        spec.skip_reason = "no factory and no path"
-        return False
-
-    if _is_too_big_name(spec.name):
-        spec.skip_reason = "name suggests too-large model"
-        return False
-
-    # Invoke the factory
+def _export_torch_to_onnx(model, dst, input_shape):
     try:
-        result = spec.factory()
-    except Exception as e:
-        spec.skip_reason = f"factory error: {type(e).__name__}: {str(e)[:120]}"
-        return False
+        import torch
+    except ImportError as error:
+        raise OptionalDependencyError(
+            "Exporting a torch model requires infinitensor-test[torchvision]."
+        ) from error
+    if not input_shape or any(not isinstance(d, int) or d <= 0 for d in input_shape):
+        raise ValueError("torch export requires a concrete, positive input_shape")
+    model.eval()
+    torch.onnx.export(model, torch.zeros(*input_shape), str(dst), opset_version=18,
+                      dynamo=False, verbose=False, input_names=["x"], output_names=["y"])
+    return dst.exists()
 
-    if result is None:
-        spec.skip_reason = "factory returned None"
-        return False
 
-    # Factory may return:
-    #   - torch.nn.Module: export to ONNX
-    #   - ("onnx", onnx.ModelProto): save directly
-    #   - ("file", path, name): copy the file
-    if isinstance(result, tuple):
-        kind = result[0]
-        if kind == "onnx":
-            onnx_model: onnx.ModelProto = result[1]
+def _package_root(spec, models_dir):
+    name = re.sub(r"[^A-Za-z0-9_.-]", "_", spec.name)[:80] or "model"
+    return Path(models_dir).resolve() / spec.source.value / (name + "-" + digest(spec.name)[:12])
+
+
+def _origin_digest(path):
+    manifest = model_manifest(path)
+    # Renaming the main ONNX file during copying does not change its identity.
+    return digest({"onnx": manifest["files"][path.name],
+                   "external": {k: v for k, v in manifest["files"].items() if k != path.name}})
+
+
+def _copy_into_stage(source, stage):
+    # Preserve names so a legal external file called model.onnx cannot collide
+    # with a renamed main graph. Cache metadata lives outside files/.
+    target = stage / "files" / Path(source).name
+    copy_package(source, target)
+    return target
+
+
+def _record(spec, target, manifest, validation, cached):
+    spec.path = target
+    spec.size_hint_bytes = manifest["size_bytes"]
+    spec.metadata.update(model_sha256=manifest["sha256"], validation=validation,
+                         cache_hit=cached, collector_version=GENERATOR_VERSION)
+
+
+@contextmanager
+def _staging_package(root):
+    # The unique directory itself never moves. In particular, Windows readers
+    # and virus scanners cannot interfere with a directory rename at publish.
+    stage = Path(tempfile.mkdtemp(prefix="package-", dir=root))
+    retained = False
+
+    def retain():
+        nonlocal retained
+        retained = True
+
+    try:
+        yield stage, retain
+    finally:
+        if not retained:
+            assert stage.resolve().parent == root.resolve()
+            assert stage.name.startswith("package-")
+            shutil.rmtree(stage, ignore_errors=True)
+
+
+def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
+    root = _package_root(spec, models_dir)
+    current = root / "current.json"
+    for key in ("collection_error", "collection_error_code", "validation", "model_sha256", "cache_hit"):
+        spec.metadata.pop(key, None)
+    spec.skip_reason = None
+    try:
+        origin = None
+        if spec.factory is None and spec.path:
+            origin_path = Path(spec.metadata.get("origin_path", spec.path)).absolute()
+            if origin_path.is_file():
+                spec.metadata["origin_path"] = str(origin_path)
+                origin = _origin_digest(origin_path)
+            elif spec.path.is_file():
+                origin = _origin_digest(spec.path)
+        cache_key = digest({
+            "collector_version": GENERATOR_VERSION, "onnx_version": onnx.__version__,
+            "onnxruntime_version": ort.__version__, "input_file_sha256": input_file_digest(spec),
+            "expected_rejection": spec.expected_rejection, "rejection_reason": spec.rejection_reason,
+            "numpy_version": np.__version__, "seed": seed,
+            "source": spec.source.value, "name": spec.name,
+            "input_shape": spec.input_shape, "num_classes": spec.num_classes,
+            "generator_version": spec.metadata.get("generator_version", 0),
+            "definition_sha256": spec.metadata.get("definition_sha256"),
+            "source_params": spec.metadata.get("source_params", {}), "origin": origin,
+            "source_library_version": getattr(sys.modules.get(spec.source.value), "__version__", None),
+        })
+        if not force and current.is_file():
             try:
-                onnx.save(onnx_model, str(dst))
-            except Exception as e:
-                spec.skip_reason = f"onnx.save failed: {e}"
-                return False
-        elif kind == "file":
-            src_path = Path(result[1])
-            if not src_path.exists():
-                spec.skip_reason = f"source file missing: {src_path}"
-                return False
-            try:
-                shutil.copy(src_path, dst)
-            except shutil.SameFileError:
+                pointer = json.loads(current.read_text(encoding="utf-8"))
+                package = (root / pointer["package"]).resolve()
+                if not package.is_relative_to(root.resolve()):
+                    raise ValueError("cache pointer escapes model directory")
+                stamp = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
+                if stamp["cache_key"] == cache_key:
+                    target = (package / stamp["model_file"]).resolve()
+                    if not target.is_relative_to(package / "files"):
+                        raise ValueError("cached main file escapes package")
+                    manifest, validation = validate_model(target, spec, seed)
+                    if manifest == stamp["model"] and validation == stamp["validation"]:
+                        if manifest["size_bytes"] > max_size_bytes:
+                            spec.path = None
+                            spec.size_hint_bytes = manifest["size_bytes"]
+                            spec.skip_reason = "size_limit"
+                            return False
+                        _record(spec, target, manifest, validation, True)
+                        return True
+            except Exception:
+                # Rebuild a corrupt, incomplete or obsolete cache from its source.
                 pass
-        else:
-            spec.skip_reason = f"unknown factory return kind: {kind}"
-            return False
-    else:
-        # Assume it's a torch model
-        if not _export_torch_to_onnx(result, dst, spec.input_shape or [1, 3, 224, 224]):
-            spec.skip_reason = "torch.onnx.export failed"
-            return False
-
-    # Cleanup any leftover .onnx.data or onnx__* files
-    for pat in ["onnx__*", "*.onnx.data"]:
-        for p in dst_dir.glob(pat):
-            try:
-                p.unlink()
-            except OSError:
-                pass
-
-    if not dst.exists():
-        spec.skip_reason = "export produced no file"
+        root.mkdir(parents=True, exist_ok=True)
+        with _staging_package(root) as (stage, retain):
+            (stage / "files").mkdir()
+            dst = stage / "files/model.onnx"
+            if spec.factory:
+                with factory_seed(spec, seed), redirect_stdout(io.StringIO()):
+                    result = spec.factory()
+                    if isinstance(result, onnx.ModelProto):
+                        onnx.save(result, str(dst))
+                    elif isinstance(result, tuple) and len(result) >= 2:
+                        if result[0] == "onnx":
+                            onnx.save(result[1], str(dst))
+                        elif result[0] == "file":
+                            dst = _copy_into_stage(result[1], stage)
+                        else:
+                            raise ValueError(f"unknown factory kind: {result[0]!r}")
+                    elif result is None:
+                        raise ValueError("factory returned None")
+                    else:
+                        _export_torch_to_onnx(result, dst, spec.input_shape)
+            elif spec.path and spec.path.is_file():
+                dst = _copy_into_stage(spec.path, stage)
+            else:
+                raise ValueError("no factory and no existing model path")
+            manifest, validation = validate_model(dst, spec, seed)
+            spec.size_hint_bytes = manifest["size_bytes"]
+            if manifest["size_bytes"] > max_size_bytes:
+                spec.path = None
+                spec.skip_reason = "size_limit"
+                return False
+            stamp = {
+                "schema_version": 2, "collector_version": GENERATOR_VERSION,
+                "cache_key": cache_key, "model": manifest, "validation": validation,
+                "seed": seed, "case_seed": stable_seed(seed, spec.short_id()),
+                "generator_version": spec.metadata.get("generator_version", 0),
+                "model_file": dst.relative_to(stage).as_posix(),
+            }
+            atomic_json(stage / "manifest.json", stamp)
+            # Only the pointer changes atomically; old generations stay readable.
+            atomic_json(current, {"schema_version": 2, "package": stage.name})
+            retain()
+            _record(spec, stage / stamp["model_file"], manifest, validation, False)
+            return True
+    except OptionalDependencyError:
+        raise
+    except Exception as error:
+        spec.path = None
+        spec.metadata["collection_error"] = f"{type(error).__name__}: {error}"
+        spec.metadata["collection_error_code"] = (
+            error.stage if isinstance(error, ModelValidationError) else "collection_failure")
         return False
 
-    sz = dst.stat().st_size
-    if sz > max_size_bytes:
-        dst.unlink()
-        spec.skip_reason = f"produced too-large file ({sz} bytes)"
-        return False
 
-    spec.path = dst
-    spec.size_hint_bytes = sz
-    return True
-
-
-def collect(
-    catalog: ModelCatalog,
-    settings: Settings,
-    sources: Optional[List[str]] = None,
-    force: bool = False,
-    progress: bool = True,
-) -> Dict[str, Any]:
-    """Materialize a catalog of specs to disk.
-
-    Args:
-        catalog: catalog with specs (populated by `models.registry.get_source`).
-        settings: runtime settings (controls data dir, max size, ...).
-        sources: optional list of source ids; if given, only those are collected.
-        force: re-export even if file exists.
-        progress: print progress to stderr.
-
-    Returns:
-        stats dict with counts (added, skipped, failed).
-    """
-    specs = catalog.specs
-    if sources:
-        sources_set = set(sources)
-        specs = [s for s in specs if s.source.value in sources_set]
-
-    n = len(specs)
-    t0 = time.time()
-    n_added = 0
-    n_skipped = 0
-    n_failed = 0
-
-    for i, spec in enumerate(specs):
-        if progress and (i % 50 == 0 or i == n - 1):
-            elapsed = time.time() - t0
-            rate = (i + 1) / max(elapsed, 0.01)
-            print(
-                f"  [{i+1}/{n}] +{n_added} -{n_skipped} !{n_failed} "
-                f"({elapsed:.0f}s, {rate:.1f}/s)",
-                file=sys.stderr,
-            )
-        ok = _materialize_one(spec, settings.models_dir, settings.max_model_size_bytes, force=force)
+def collect(catalog, settings, sources=None, force=False, progress=True, limit=None):
+    if limit is not None and limit <= 0:
+        raise ValueError("limit must be positive")
+    existing = ModelCatalog.load(settings.models_dir)
+    selected = [s for s in catalog if not sources or s.source.value in sources
+                or s.source_id in sources
+                or any(sid in sources for sid in s.metadata.get("source_ids", []))]
+    if limit is not None:
+        selected = selected[:limit]
+    counts = {"total": len(selected), "added": 0, "cached": 0,
+              "generated": 0, "skipped": 0, "failed": 0,
+              "positive_validated": 0, "negative_rejected": 0, "errors_by_stage": {}}
+    start = time.monotonic()
+    for index, spec in enumerate(selected):
+        if spec.is_skipped and spec.skip_reason != "size_limit":
+            counts["skipped"] += 1
+            continue
+        cap = settings.max_model_size_bytes
+        if "max_size_mb" in spec.metadata:
+            cap = min(cap, int(spec.metadata["max_size_mb"] * 1024 * 1024))
+        ok = _materialize_one(spec, settings.models_dir, cap, force, settings.random_seed)
+        counts["added" if ok else "skipped" if spec.is_skipped else "failed"] += 1
         if ok:
-            n_added += 1
-        elif spec.is_skipped:
-            n_skipped += 1
-        else:
-            n_failed += 1
-
-    catalog.save()
-    stats = {
-        "total": n,
-        "added": n_added,
-        "skipped": n_skipped,
-        "failed": n_failed,
-        "elapsed_s": round(time.time() - t0, 2),
-    }
-    return stats
+            counts["cached" if spec.metadata["cache_hit"] else "generated"] += 1
+            counts["negative_rejected" if spec.expected_rejection else "positive_validated"] += 1
+        elif not spec.is_skipped:
+            stage = spec.metadata.get("collection_error_code", "collection_failure")
+            counts["errors_by_stage"][stage] = counts["errors_by_stage"].get(stage, 0) + 1
+        if progress and (index % 50 == 0 or index == len(selected) - 1):
+            print(f"[{index + 1}/{len(selected)}] collected={counts['added']} "
+                  f"failed={counts['failed']} skipped={counts['skipped']}", file=sys.stderr)
+    # A filtered collection updates its own entries and retains other sources.
+    merged = {(s.source.value, s.name): s for s in existing}
+    merged.update({(s.source.value, s.name): s for s in selected})
+    ModelCatalog(settings.models_dir, list(merged.values())).save()
+    counts["elapsed_s"] = round(time.monotonic() - start, 3)
+    return counts

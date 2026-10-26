@@ -34,6 +34,7 @@ from infinitensor_test.models.spec import (
     ModelCategory,
     ModelSource,
 )
+from infinitensor_test.artifacts import atomic_json
 
 
 CATALOG_FILENAME = "catalog.json"
@@ -77,15 +78,20 @@ class ModelCatalog:
         include_skipped: bool = False,
         max_size_bytes: Optional[int] = None,
         limit: Optional[int] = None,
+        include_negatives: bool = False,
     ) -> "ModelCatalog":
         """Return a new catalog with the matching subset."""
         import fnmatch
 
         out: List[ModelSpec] = []
         for s in self.specs:
+            if s.expected_rejection and not include_negatives:
+                continue
             if not include_skipped and s.is_skipped:
                 continue
-            if sources and s.source not in sources:
+            if sources and not any(
+                value in sources for value in [s.source, s.source_id] + s.metadata.get("source_ids", [])
+            ):
                 continue
             if categories and s.category not in categories:
                 continue
@@ -124,6 +130,10 @@ class ModelCatalog:
         return {
             "total": len(self.specs),
             "skipped": sum(1 for s in self.specs if s.is_skipped),
+            "positive": sum(not s.expected_rejection for s in self.specs),
+            "negative": sum(s.expected_rejection for s in self.specs),
+            "negative_rejected": sum(s.expected_rejection and
+                s.metadata.get("validation", {}).get("state") == "expected_rejection" for s in self.specs),
             "by_source": {k.split(":", 1)[1]: v for k, v in c.items() if k.startswith("source:")},
             "by_category": {k.split(":", 1)[1]: v for k, v in c.items() if k.startswith("category:")},
         }
@@ -135,12 +145,12 @@ class ModelCatalog:
     def save(self) -> None:
         """Persist the catalog to JSON (so materialization state survives)."""
         data = {
+            "schema_version": 2,
             "models_dir": str(self.models_dir),
             "generated_at": time.time(),
             "specs": [_spec_to_dict(s) for s in self.specs],
         }
-        with open(self.index_path, "w") as f:
-            json.dump(data, f, indent=2)
+        atomic_json(self.index_path, data)
 
     @classmethod
     def load(cls, models_dir: Path) -> "ModelCatalog":
@@ -148,7 +158,7 @@ class ModelCatalog:
         index_path = Path(models_dir) / CATALOG_FILENAME
         if not index_path.exists():
             return cls(models_dir)
-        with open(index_path) as f:
+        with open(index_path, encoding="utf-8") as f:
             data = json.load(f)
         specs = [_dict_to_spec(d) for d in data.get("specs", [])]
         return cls(models_dir, specs)

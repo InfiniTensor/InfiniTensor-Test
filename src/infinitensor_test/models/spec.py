@@ -11,7 +11,7 @@ import numpy as np
 
 # A "factory" produces a model when called. For PyTorch sources, it returns
 # a torch.nn.Module. For synthetic sources, it returns a tuple
-# (input_shape, onnx_model_proto) so the collector can write ONNX directly
+# ("onnx", onnx_model_proto) so the collector can write ONNX directly
 # without going through PyTorch tracing (which is brittle for some shapes).
 
 
@@ -78,6 +78,22 @@ class ModelSpec:
     num_classes: int = 1000
     # Free-form metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # Source plugin id differs from its family, e.g. synthetic_shape.
+    source_id: Optional[str] = None
+    # Deliberately invalid fixtures are validated separately and never executed.
+    expected_rejection: bool = False
+    rejection_reason: Optional[str] = None
+
+    def __post_init__(self):
+        self.source = ModelSource(self.source)
+        self.category = ModelCategory(self.category)
+        self.format = ModelFormat(self.format)
+        if self.path is not None:
+            self.path = Path(self.path)
+        if not isinstance(self.expected_rejection, bool):
+            raise ValueError("expected_rejection must be a boolean")
+        if self.expected_rejection != bool(self.rejection_reason):
+            raise ValueError("negative fixtures require a nonempty rejection_reason")
 
     @property
     def is_skipped(self) -> bool:
