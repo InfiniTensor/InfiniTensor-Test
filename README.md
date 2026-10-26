@@ -1,10 +1,11 @@
 # InfiniTensor-Test
 
-The [real-network corpus](catalogs/real-networks.json) contains **1,347 deduplicated
-network configurations** from timm, PyTorchCV and Segmentation Models PyTorch,
+The [real-network corpus](catalogs/real-networks.json) contains **1,409 deduplicated
+network configurations across 16 tasks**, including text, audio, video, optical flow,
+depth estimation and super-resolution alongside classification and segmentation,
 validated with ONNX checks, ONNX Runtime and all-output PyTorch/ONNX comparison.
 The 548 synthetic positives and 18 negatives are counted separately. See
-[collection, fixed dependencies and replay commands](docs/model-expansion.md).
+[multi-task sources, fixed dependencies and replay commands](docs/task-expansion.md).
 
 This change combines lazy sources, reproducible package collection and model
 validity repairs: 548 synthetic positives must pass ONNX checks and CPU reference

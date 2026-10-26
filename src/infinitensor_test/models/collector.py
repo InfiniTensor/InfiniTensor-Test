@@ -25,7 +25,8 @@ from infinitensor_test.models.catalog import ModelCatalog
 from infinitensor_test.models.registry import OptionalDependencyError, SourceSizeLimitError
 from infinitensor_test.models.validation import (ModelValidationError, input_file_digest,
                                                  validate_reference)
-from infinitensor_test.models.torch_validation import validate_torch_export
+from infinitensor_test.models.torch_validation import flatten_torch_outputs, validate_torch_export
+from infinitensor_test.models.torch_inputs import contract_arrays, materialize_contract
 
 
 # Bump when export/validation policy changes. Unversioned legacy caches are
@@ -41,7 +42,7 @@ def factory_seed(spec, seed):
     random.seed(value)
     try:
         torch = sys.modules.get("torch")
-        if spec.source.value in ("torchvision", "timm") and torch is None:
+        if (spec.source.value in ("torchvision", "timm") or spec.metadata.get("export_backend") == "torch") and torch is None:
             import torch
         if torch is not None:
             with torch.random.fork_rng(devices=[]):
@@ -60,18 +61,40 @@ def validate_model(path, spec=None, seed=42):
     return manifest, validate_reference(path, spec, seed)
 
 
-def _export_torch_to_onnx(model, dst, input_shape):
+def _export_torch_to_onnx(model, dst, input_shape, spec=None, seed=42):
     try:
         import torch
     except ImportError as error:
         raise OptionalDependencyError(
             "Exporting a torch model requires infinitensor-test[torchvision]."
         ) from error
-    if not input_shape or any(not isinstance(d, int) or d <= 0 for d in input_shape):
-        raise ValueError("torch export requires a concrete, positive input_shape")
+    if spec is not None and "torch_input_contract" in spec.metadata:
+        values = contract_arrays(spec, seed)
+        inputs, names = tuple(torch.from_numpy(v) for v in values.values()), list(values)
+    else:
+        if not input_shape or any(not isinstance(d, int) or d <= 0 for d in input_shape):
+            raise ValueError("torch export requires a concrete, positive input_shape")
+        inputs, names = (torch.zeros(*input_shape),), ["x"]
     model.eval()
-    torch.onnx.export(model, torch.zeros(*input_shape), str(dst), opset_version=18,
-                      dynamo=False, verbose=False, input_names=["x"], output_names=["y"])
+    torch.onnx.export(model, inputs, str(dst), opset_version=18,
+                      dynamo=False, verbose=False, input_names=names,
+                      output_names=spec.metadata.get("torch_output_names", ["y"]) if spec else ["y"])
+    if spec is not None and "torch_input_contract" in spec.metadata:
+        # These are explicitly static invocations. Replace exporter-generated
+        # symbolic output aliases with actual PyTorch shapes, never guessed shapes.
+        with torch.inference_mode():
+            outputs = flatten_torch_outputs(model(*inputs))
+        graph = onnx.load(str(dst), load_external_data=False)
+        if len(graph.graph.output) != len(outputs):
+            raise ValueError("exporter output count differs from torch invocation")
+        for info, value in zip(graph.graph.output, outputs):
+            if np.dtype(onnx.helper.tensor_dtype_to_np_dtype(info.type.tensor_type.elem_type)) != value.dtype:
+                raise ValueError("exporter output dtype differs from torch invocation")
+            shape = info.type.tensor_type.shape
+            shape.ClearField("dim")
+            for size in value.shape:
+                shape.dim.add().dim_value = size
+        onnx.save(graph, str(dst))
     return dst.exists()
 
 
@@ -132,6 +155,7 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
         spec.metadata.pop(key, None)
     spec.skip_reason = None
     try:
+        materialize_contract(spec, root, seed)
         origin = None
         if spec.factory is None and spec.path:
             origin_path = Path(spec.metadata.get("origin_path", spec.path)).absolute()
@@ -149,6 +173,9 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
             "input_shape": spec.input_shape, "num_classes": spec.num_classes,
             "generator_version": spec.metadata.get("generator_version", 0),
             "definition_sha256": spec.metadata.get("definition_sha256"),
+            **({"torch_input_contract": spec.metadata["torch_input_contract"],
+                "torch_output_names": spec.metadata.get("torch_output_names")}
+               if "torch_input_contract" in spec.metadata else {}),
             "source_params": spec.metadata.get("source_params", {}), "origin": origin,
             "source_library_version": spec.metadata.get("source_library_version") or
                 getattr(sys.modules.get(spec.source.value), "__version__", None),
@@ -216,7 +243,7 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
                             first_conv = next((m for m in result.modules() if isinstance(m, torch.nn.Conv2d)), None)
                             if size is not None and len(size) == 2 and first_conv is not None:
                                 spec.input_shape = [1, first_conv.in_channels, *size]
-                        _export_torch_to_onnx(result, dst, spec.input_shape)
+                        _export_torch_to_onnx(result, dst, spec.input_shape, spec, seed)
                         torch_model = result
             elif spec.path and spec.path.is_file():
                 dst = _copy_into_stage(spec.path, stage)

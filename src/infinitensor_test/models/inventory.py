@@ -84,6 +84,7 @@ def real_inventory(specs):
         if spec.source.value == "synthetic" or spec.expected_rejection:
             continue
         row = {"case_id": spec.short_id(), "source": spec.source.value,
+               "source_id": spec.source_id or spec.source.value,
                "architecture": spec.metadata.get("architecture"),
                "task": spec.metadata.get("task", spec.category.value),
                "path": str(spec.path or ""), "skip_reason": spec.skip_reason,

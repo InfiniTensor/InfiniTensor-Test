@@ -28,9 +28,14 @@ def run_request(request):
         if ok:
             spec.metadata["architecture_sha256"] = architecture_digest(spec.path)
             expected = request.get("expected_architecture_sha256")
-            if expected and expected != spec.metadata["architecture_sha256"]:
+            expected_inputs = request.get("expected_inputs_sha256")
+            mismatch = ("accepted architecture fingerprint changed"
+                        if expected and expected != spec.metadata["architecture_sha256"] else
+                        "accepted input fingerprint changed" if expected_inputs and expected_inputs !=
+                        spec.metadata["validation"].get("inputs_sha256") else None)
+            if mismatch:
                 state, spec.path = "failed", None
-                spec.metadata["collection_error"] = "accepted architecture fingerprint changed"
+                spec.metadata["collection_error"] = mismatch
                 spec.metadata.pop("validation", None)
         atomic_json(result_path, {"request_sha256": request["request_sha256"],
                                   "state": state, "spec": _spec_to_dict(spec)})

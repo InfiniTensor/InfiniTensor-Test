@@ -1,9 +1,9 @@
 # InfiniTensor-Test
 
-[真实网络固定清单](catalogs/real-networks.json)已扩充至 **1347 个去重网络配置**，
-来自 timm、PyTorchCV 和 Segmentation Models PyTorch，全部通过 ONNX 检查、参考执行及
+[真实网络固定清单](catalogs/real-networks.json)已扩充至 **1409 个去重网络配置、16 种任务**，
+新增文本、音频、视频、光流、深度估计、超分辨率和时间序列等任务，全部通过 ONNX 检查、参考执行及
 PyTorch/ONNX 全部输出比较。原有 548 个合成正例与 18 个负例另计。
-安装、来源、计数规则和完整复验见[真实网络扩充说明](docs/model-expansion.md)。
+安装、来源、计数规则和完整复验见[多任务网络扩充说明](docs/task-expansion.md)。
 
 本分支合并采集基础与模型有效性修复：来源按需加载、确定性完整包缓存，
 以及 548 个合成正例的 ONNX 检查和 CPU 参考执行、18 个明确负例的按原因拒绝验证。

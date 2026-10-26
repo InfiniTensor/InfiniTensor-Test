@@ -28,6 +28,10 @@ timm = ["torch>=2.0", "torchvision>=0.15", "timm>=1.0.22"]
 pytorchcv = ["torch>=2.0", "torchvision>=0.15", "pytorchcv>=0.0.74"]
 segmentation = ["torch>=2.0", "torchvision>=0.15", "segmentation-models-pytorch>=0.5"]
 networks = ["torch>=2.0", "torchvision>=0.15", "timm>=1.0.22", "pytorchcv>=0.0.74", "segmentation-models-pytorch>=0.5"]
+super-resolution = ["torch>=2.0", "torchvision>=0.15", "torchsr>=1.0.4"]
+audio = ["torch>=2.0", "torchaudio>=2.0"]
+text = ["torch>=2.0", "transformers>=4.57.1,<5"]
+diverse = ["torch>=2.0", "torchvision>=0.15", "torchsr>=1.0.4", "torchaudio>=2.0", "transformers>=4.57.1,<5"]
 huggingface = ["huggingface_hub>=0.16"]
 full = [
     "pytorchcv>=0.0.74",

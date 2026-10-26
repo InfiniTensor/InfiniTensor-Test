@@ -48,6 +48,7 @@ def provenance(package, repository, architecture, task):
             "generator_version": 3,
             "architecture_id": f"{task}/{architecture.lower()}",
             "upstream_repository": repository,
-            "upstream_license": {"timm": "Apache-2.0", "torchvision": "BSD-3-Clause"}.get(package, "MIT"),
+            "upstream_license": {"timm": "Apache-2.0", "transformers": "Apache-2.0",
+                                 "torchaudio": "BSD-2-Clause", "torchvision": "BSD-3-Clause"}.get(package, "MIT"),
             "source_library_version": version(package), "weights": "random",
             "task": task}

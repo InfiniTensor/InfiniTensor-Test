@@ -16,6 +16,8 @@ _MODULES.update(torchvision="torchvision_source", timm="timm_source",
                 pytorchcv="pytorchcv_source", segmentation_models="segmentation_source",
                 timm_small="timm_source", huggingface="huggingface_source",
                 onnx_zoo="onnx_zoo_source")
+_MODULES.update(torchvision_tasks="vision_tasks_source", torchsr="torchsr_source",
+                torchaudio="audio_source", transformers="transformers_source")
 _DEPENDENCIES = {
     "pytorchcv": ("pytorchcv", "pytorchcv"),
     "segmentation_models": ("segmentation_models_pytorch", "segmentation"),
@@ -23,6 +25,10 @@ _DEPENDENCIES = {
     "timm": ("timm", "timm"),
     "timm_small": ("timm", "timm"),
     "huggingface": ("huggingface_hub", "huggingface"),
+    "torchvision_tasks": ("torchvision", "torchvision"),
+    "torchsr": ("torchsr", "super-resolution"),
+    "torchaudio": ("torchaudio", "audio"),
+    "transformers": ("transformers", "text"),
 }
 
 

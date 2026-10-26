@@ -183,6 +183,37 @@ def test_source_aliases_are_collected_once_and_cannot_fill_the_minimum(tmp_path,
     assert report["attempted"] == report["validated_unique"] == 1
 
 
+def test_required_task_cannot_be_replaced_by_more_classifiers(tmp_path, monkeypatch):
+    specs = [network(tmp_path)]
+    patch_source(monkeypatch, specs)
+    root = tmp_path / "run"
+    args = ["--sources", "timm", "--data-dir", str(root), "--minimum-real-models", "1"]
+    assert expand.main([*args, "--required-task", "super_resolution"]) == 1
+    report = json.loads((root / "expansion/inventory.json").read_text(encoding="utf-8"))
+    assert report["validated_unique"] == 1 and report["missing_tasks"] == ["super_resolution"]
+
+
+def test_plugin_id_and_case_budget_survive_manifest_replay(tmp_path, monkeypatch):
+    spec = network(tmp_path)
+    spec.source_id = "timm_small"
+    patch_source(monkeypatch, [spec])
+    root = tmp_path / "run"
+    assert expand.main(["--sources", "timm_small", "--data-dir", str(root), "--minimum-real-models", "1"]) == 0
+    accepted = json.loads((root / "expansion/accepted-models.json").read_text(encoding="utf-8"))
+    assert accepted["models"][0]["source"] == "timm_small"
+    accepted["models"][0]["max_size_mb"] = 3
+    manifest = tmp_path / "required.json"
+    manifest.write_text(json.dumps(accepted))
+    original, seen = expand._run_batch, []
+    def batch(requests, root, timeout, resume):
+        seen.append(requests[0]["max_size_bytes"])
+        return original(requests, root, timeout, resume)
+    monkeypatch.setattr(expand, "_run_batch", batch)
+    assert expand.main(["--manifest", str(manifest), "--data-dir", str(root),
+                        "--max-size-mb", "10", "--minimum-real-models", "1"]) == 0
+    assert seen == [3*1024*1024]
+
+
 @pytest.mark.parametrize("broken,state", [("hang", "timeout"), ("crash", "crash")])
 def test_batch_failure_keeps_prior_result_and_continues(tmp_path, monkeypatch, broken, state):
     code = '''
@@ -258,5 +289,9 @@ def test_committed_real_network_corpus_has_unique_named_and_structural_ids():
     assert len(models) >= 1001
     assert len({(m["source"], m["name"]) for m in models}) == len(models)
     assert len({m["architecture_sha256"] for m in models}) == len(models)
-    assert {m["source"] for m in models} == {"pytorchcv", "timm", "segmentation_models"}
+    assert {m["source"] for m in models} == {"pytorchcv", "timm", "segmentation_models", "torchsr", "torchaudio", "torchvision_tasks", "transformers"}
     assert all(len(m["architecture_sha256"]) == 64 and all(d > 0 for d in m["input_shape"]) for m in models)
+    diverse = json.loads((root / "catalogs/diverse-networks.json").read_text(encoding="utf-8"))
+    assert len(diverse["required_tasks"]) >= 13
+    assert set(diverse["required_tasks"]) <= {m["task"] for m in diverse["models"]}
+    assert all(m["task"] not in {"classification", "segmentation"} for m in diverse["models"])

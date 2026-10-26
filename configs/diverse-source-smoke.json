@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "required_tasks": ["super_resolution", "audio_separation", "question_answering", "time_series_forecasting", "video_classification", "optical_flow"],
+  "models": [
+    {"source": "torchsr", "name": "ninasr_b0_x2"},
+    {"source": "torchaudio", "name": "conv_tasnet"},
+    {"source": "transformers", "name": "electra_question_answering"},
+    {"source": "transformers", "name": "time_series_transformer_teacher_forced"},
+    {"source": "torchvision_tasks", "name": "mc3_18"},
+    {"source": "torchvision_tasks", "name": "raft_small"}
+  ]
+}

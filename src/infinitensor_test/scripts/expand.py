@@ -105,6 +105,7 @@ def main(argv=None):
     p.add_argument("--offline", action="store_true")
     p.add_argument("--resume", action="store_true")
     p.add_argument("--force", action="store_true")
+    p.add_argument("--required-task", nargs="+", default=[])
     args = p.parse_args(argv)
     try:
         if args.jobs < 1 or args.batch_size < 1 or not math.isfinite(args.timeout) or args.timeout <= 0 or args.max_size_mb < 1 or args.minimum_real_models < 0:
@@ -118,8 +119,13 @@ def main(argv=None):
             raise ValueError("each source-config entry must be an options mapping")
         selected_ids = None
         manifest_models = {}
+        required_tasks = set(args.required_task)
         if args.manifest:
             manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+            tasks = manifest.get("required_tasks", [])
+            if not isinstance(tasks, list) or any(not isinstance(t, str) or not t for t in tasks):
+                raise ValueError("manifest required_tasks must be a list of task names")
+            required_tasks.update(tasks)
             selected_ids = {(r["source"], r["name"]) for r in manifest["models"]}
             if len(selected_ids) != len(manifest["models"]):
                 raise ValueError("manifest repeats model IDs")
@@ -162,10 +168,14 @@ def main(argv=None):
         requests = []
         for source, spec, params in selected:
             source_limit = params.get("max_size_mb", args.max_size_mb)
+            case_limit_mb = manifest_models.get((source, spec.name), {}).get("max_size_mb", args.max_size_mb)
+            if (isinstance(case_limit_mb, bool) or not isinstance(case_limit_mb, (int, float))
+                    or not math.isfinite(case_limit_mb) or case_limit_mb <= 0):
+                raise ValueError(f"{source}:{spec.name}: manifest max_size_mb must be finite and positive")
             if (isinstance(source_limit, bool) or not isinstance(source_limit, (int, float))
                     or not math.isfinite(source_limit) or source_limit <= 0):
                 raise ValueError(f"{source}: max_size_mb must be finite and positive")
-            case_limit = min(args.max_size_mb * 1024 * 1024, int(source_limit * 1024 * 1024))
+            case_limit = int(min(args.max_size_mb, source_limit, case_limit_mb) * 1024 * 1024)
             if case_limit < 1:
                 raise ValueError(f"{source}: size budget must allow at least one byte")
             request = {"source": source, "name": spec.name, "params": params,
@@ -174,6 +184,7 @@ def main(argv=None):
                        "library_version": spec.metadata["source_library_version"], "code_sha256": digest(code)}
             if (source, spec.name) in manifest_models:
                 request["expected_architecture_sha256"] = manifest_models[(source, spec.name)].get("architecture_sha256")
+                request["expected_inputs_sha256"] = manifest_models[(source, spec.name)].get("inputs_sha256")
             request["request_sha256"] = digest(request)
             requests.append(request)
         records, specs = [], []
@@ -198,6 +209,7 @@ def main(argv=None):
                     ModelCatalog(settings.models_dir, list(merged.values())).save()
         ModelCatalog(settings.models_dir, list(merged.values())).save()
         inventory = real_inventory(specs)
+        inventory["missing_tasks"] = sorted(required_tasks - inventory["by_task"].keys())
         failed = [r for r in records if r["state"] in ("failed", "timeout", "crash")]
         required = len(selected_ids) if selected_ids is not None else len(requests)
         inventory.update(complete=len(records) == len(requests) == required, attempted=len(requests), required=required,
@@ -207,15 +219,16 @@ def main(argv=None):
         atomic_json(root / "progress.json", {"complete": inventory["complete"], "completed": len(records),
                                                "total": len(requests), "validated_unique": inventory["validated_unique"]})
         atomic_json(root / "results.json", records)
-        accepted = {"schema_version": 1, "models": [
-            {"source": r["source"], "name": r["case_id"].split(":", 1)[1],
-             "architecture_sha256": r["architecture_sha256"]}
+        accepted = {"schema_version": 1, "required_tasks": sorted(required_tasks), "models": [
+            {"source": r["source_id"], "name": r["case_id"].split(":", 1)[1],
+             "architecture_sha256": r["architecture_sha256"],
+             "inputs_sha256": r["validation"].get("inputs_sha256")}
             for r in inventory["models"] if r["state"] == "validated_unique"]}
         # A strict replay must never shrink or rewrite its required input set.
         atomic_json(root / ("validated-models.json" if args.manifest else "accepted-models.json"), accepted)
         print(json.dumps({k: v for k, v in inventory.items() if k != "models"}, indent=2))
         strict_complete = not args.manifest or inventory["validated_unique"] == required
-        return 0 if inventory["complete"] and strict_complete and not failed and inventory["validated_unique"] >= args.minimum_real_models else 1
+        return 0 if inventory["complete"] and strict_complete and not failed and not inventory["missing_tasks"] and inventory["validated_unique"] >= args.minimum_real_models else 1
     except (ValueError, RuntimeError, KeyError, ImportError, OSError, yaml.YAMLError) as error:
         print(f"Expansion configuration/environment error: {error}", file=sys.stderr)
         return 2

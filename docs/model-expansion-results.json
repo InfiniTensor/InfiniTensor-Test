@@ -70,5 +70,7 @@
     "source_smoke_validated_unique": 3,
     "source_smoke_exit_code": 0,
     "github_hosted_ci": "pending"
-  }
+  },
+  "scope": "Initial 1347-network expansion at commit c7430c4; see task-expansion-results.json for current combined corpus.",
+  "manifest_revision": "c7430c4c0bb50540ebd19b47aa62c416c38a6b56"
 }
