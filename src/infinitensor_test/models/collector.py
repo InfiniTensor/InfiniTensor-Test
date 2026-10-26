@@ -5,7 +5,7 @@ replace the last valid package. No exporter cleans a shared model directory.
 Every positive package must pass ONNX checks and CPU reference execution.
 """
 
-from contextlib import contextmanager, redirect_stdout
+from contextlib import contextmanager, nullcontext, redirect_stdout
 import io
 import json
 from pathlib import Path
@@ -41,6 +41,16 @@ def factory_seed(spec, seed):
     np.random.seed(value)
     random.seed(value)
     try:
+        if spec.metadata.get("export_backend") == "paddle":
+            import paddle
+            paddle.set_device("cpu")
+            state = paddle.get_rng_state("cpu")
+            paddle.seed(value)
+            try:
+                yield
+            finally:
+                paddle.set_rng_state(state)
+            return
         torch = sys.modules.get("torch")
         if (spec.source.value in ("torchvision", "timm") or spec.metadata.get("export_backend") == "torch") and torch is None:
             import torch
@@ -180,6 +190,11 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
             "source_library_version": spec.metadata.get("source_library_version") or
                 getattr(sys.modules.get(spec.source.value), "__version__", None),
             "torch_version": getattr(sys.modules.get("torch"), "__version__", None),
+            **({"input_contract": spec.metadata.get("input_contract"),
+                "upstream_revision": spec.metadata.get("upstream_revision"),
+                "paddle_version": spec.metadata.get("paddle_version"),
+                "paddle2onnx_version": spec.metadata.get("paddle2onnx_version")}
+               if spec.metadata.get("export_backend") == "paddle" else {}),
         })
         if not force and current.is_file():
             try:
@@ -194,12 +209,13 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
                         raise ValueError("cached main file escapes package")
                     manifest, validation = validate_model(target, spec, seed)
                     old_validation = dict(stamp["validation"])
-                    parity = old_validation.pop("torch_reference", None)
-                    if spec.metadata.get("export_backend") == "torch" and (not parity or parity.get("state") != "passed"):
-                        raise ValueError("real network cache has no torch/ONNX parity evidence")
+                    parities = {key: old_validation.pop(key, None) for key in ("torch_reference", "paddle_reference")}
+                    backend = spec.metadata.get("export_backend")
+                    parity = parities.get(f"{backend}_reference")
+                    if backend in ("torch", "paddle") and (not parity or parity.get("state") != "passed"):
+                        raise ValueError("real network cache has no source-framework/ONNX parity evidence")
                     if manifest == stamp["model"] and validation == old_validation:
-                        if parity:
-                            validation["torch_reference"] = parity
+                        validation.update({k: v for k, v in parities.items() if v})
                         if manifest["size_bytes"] > max_size_bytes:
                             spec.path = None
                             spec.size_hint_bytes = manifest["size_bytes"]
@@ -215,8 +231,11 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
             (stage / "files").mkdir()
             dst = stage / "files/model.onnx"
             torch_model = None
+            paddle_model = None
+            paddle_expected = None
             if spec.factory:
-                with factory_seed(spec, seed), redirect_stdout(io.StringIO()):
+                output = nullcontext() if spec.metadata.get("export_backend") == "paddle" else redirect_stdout(io.StringIO())
+                with factory_seed(spec, seed), output:
                     result = spec.factory()
                     if isinstance(result, onnx.ModelProto):
                         onnx.save(result, str(dst))
@@ -229,6 +248,17 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
                             raise ValueError(f"unknown factory kind: {result[0]!r}")
                     elif result is None:
                         raise ValueError("factory returned None")
+                    elif spec.metadata.get("export_backend") == "paddle":
+                        from .paddle_validation import export_paddle
+                        parameter_bytes = sum(int(np.prod(v.shape)) * np.dtype(str(v.dtype).split(".")[-1]).itemsize
+                                              for v in result.state_dict().values())
+                        spec.metadata["parameter_size_bytes"] = parameter_bytes
+                        if parameter_bytes > max_size_bytes:
+                            spec.path = None
+                            spec.skip_reason = "parameter_size_limit"
+                            return False
+                        paddle_expected = export_paddle(result, dst, spec, seed)
+                        paddle_model = result
                     else:
                         # Bound large source libraries before expensive ONNX export.
                         parameter_bytes = sum(v.numel() * v.element_size() for v in result.state_dict().values())
@@ -252,6 +282,9 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
             manifest, validation = validate_model(dst, spec, seed)
             if torch_model is not None and spec.metadata.get("model_kind") == "real_network":
                 validation["torch_reference"] = validate_torch_export(torch_model, dst, spec, seed)
+            if paddle_model is not None:
+                from .paddle_validation import validate_paddle_export
+                validation["paddle_reference"] = validate_paddle_export(paddle_model, dst, spec, seed, paddle_expected)
             spec.size_hint_bytes = manifest["size_bytes"]
             if manifest["size_bytes"] > max_size_bytes:
                 spec.path = None
@@ -281,7 +314,9 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
         spec.path = None
         spec.metadata["collection_error"] = f"{type(error).__name__}: {error}"
         spec.metadata["collection_error_code"] = (
-            error.stage if isinstance(error, ModelValidationError) else "collection_failure")
+            error.stage if isinstance(error, ModelValidationError) else
+            "environment_blocked" if isinstance(error, ImportError) and spec.metadata.get("export_backend") == "paddle"
+            else "collection_failure")
         return False
 
 

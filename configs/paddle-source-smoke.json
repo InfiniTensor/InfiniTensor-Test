@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "required_tasks": ["text_detection", "text_recognition", "table_structure_recognition", "image_matting"],
+  "models": [
+    {"source": "paddleocr", "name": "db_mobilenet_v3"},
+    {"source": "paddleocr", "name": "crnn_mobilenet_v3"},
+    {"source": "paddleocr", "name": "slanet"},
+    {"source": "paddleseg", "name": "modnet_mobilenet_v2"}
+  ]
+}

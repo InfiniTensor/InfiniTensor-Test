@@ -18,6 +18,7 @@ _MODULES.update(torchvision="torchvision_source", timm="timm_source",
                 onnx_zoo="onnx_zoo_source")
 _MODULES.update(torchvision_tasks="vision_tasks_source", torchsr="torchsr_source",
                 torchaudio="audio_source", transformers="transformers_source")
+_MODULES.update({name: "paddle_source" for name in ("paddleocr", "paddleseg", "paddledetection")})
 _DEPENDENCIES = {
     "pytorchcv": ("pytorchcv", "pytorchcv"),
     "segmentation_models": ("segmentation_models_pytorch", "segmentation"),
@@ -29,6 +30,9 @@ _DEPENDENCIES = {
     "torchsr": ("torchsr", "super-resolution"),
     "torchaudio": ("torchaudio", "audio"),
     "transformers": ("transformers", "text"),
+    "paddleocr": ("paddle", "paddle"),
+    "paddleseg": ("paddle", "paddle"),
+    "paddledetection": ("paddle", "paddle"),
 }
 
 

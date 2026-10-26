@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-27",
+  "candidates": 17,
+  "validated_unique": 13,
+  "duplicates": 0,
+  "by_source": {
+    "paddleocr": 8,
+    "paddleseg": 5
+  },
+  "by_task": {
+    "text_recognition": 3,
+    "text_detection": 2,
+    "table_structure_recognition": 2,
+    "text_orientation": 1,
+    "segmentation": 2,
+    "image_matting": 3
+  },
+  "combined_validated_unique": 1422,
+  "combined_by_task": {
+    "text_recognition": 3,
+    "text_detection": 2,
+    "table_structure_recognition": 2,
+    "text_orientation": 1,
+    "segmentation": 262,
+    "image_matting": 3,
+    "classification": 1082,
+    "detection": 9,
+    "pose_estimation": 1,
+    "audio_separation": 1,
+    "speech_recognition": 2,
+    "super_resolution": 27,
+    "video_classification": 5,
+    "optical_flow": 2,
+    "language_modeling": 5,
+    "question_answering": 4,
+    "text_classification": 4,
+    "token_classification": 4,
+    "depth_estimation": 1,
+    "text_generation": 1,
+    "time_series_forecasting": 1
+  },
+  "libraries": {
+    "paddlepaddle": "3.0.0",
+    "paddle2onnx": "2.0.1",
+    "onnxoptimizer": "0.3.13",
+    "numpy": "1.26.4",
+    "onnx": "1.17.0",
+    "onnxruntime": "1.20.1",
+    "protobuf": "4.25.3",
+    "setuptools": "78.1.0",
+    "opencv-python-headless": "4.11.0.86",
+    "scipy": "1.17.1",
+    "scikit-learn": "1.7.2",
+    "pymatting": "1.1.14",
+    "numba": "0.68.0",
+    "llvmlite": "0.50.0",
+    "visualdl": "2.5.3",
+    "scikit-image": "0.26.0"
+  },
+  "upstream_revisions": {
+    "paddleocr": {
+      "repository": "PaddleOCR",
+      "revision": "3f32858ce3fb95ba04a8202000e432bcc50a6016"
+    },
+    "paddleseg": {
+      "repository": "PaddleSeg",
+      "revision": "3c4db66de1d9d59d0628ed87590b6308a2f4aa2a"
+    }
+  },
+  "failed_by_stage": {
+    "export_mismatch": 2,
+    "environment_blocked": 2
+  },
+  "failures": [
+    {
+      "source": "paddleocr",
+      "name": "east_resnet50_vd",
+      "stage": "export_mismatch",
+      "error": "ModelValidationError: fetch_name_1: framework/ONNX numerical mismatch (atol=rtol=1e-3)"
+    },
+    {
+      "source": "paddleocr",
+      "name": "pse_resnet50_vd",
+      "stage": "export_mismatch",
+      "error": "ModelValidationError: fetch_name_0: framework/ONNX numerical mismatch (atol=rtol=1e-3)"
+    },
+    {
+      "source": "paddledetection",
+      "name": "picodet_s_320",
+      "stage": "environment_blocked",
+      "error": "ModuleNotFoundError: No module named 'imgaug'"
+    },
+    {
+      "source": "paddledetection",
+      "name": "tinypose_128x96",
+      "stage": "environment_blocked",
+      "error": "ModuleNotFoundError: No module named 'imgaug'"
+    }
+  ],
+  "manifest": "catalogs/paddle-networks.json",
+  "general_manifest": "catalogs/real-networks.json",
+  "paddle_manifest_payload_sha256": "ae22a6918d15332100e085bcfe157675ac9818729c890eb36cfa76f14d44475e",
+  "general_manifest_payload_sha256": "ce0fccb1a04dec0d961aeabebc8eda8d8941d2393e1c5fbd1668bb732bb110e1",
+  "normalized_source_and_tests_sha256": "07501fc3dc60137f030478e7233990c4cb1092d23825ea233630a11359cc4f5e",
+  "paddle_strict": {
+    "schema_version": 1,
+    "real_candidates": 13,
+    "validated_unique": 13,
+    "duplicates": 0,
+    "excluded": 0,
+    "by_source": {
+      "paddleocr": 8,
+      "paddleseg": 5
+    },
+    "by_task": {
+      "text_recognition": 3,
+      "text_detection": 2,
+      "table_structure_recognition": 2,
+      "text_orientation": 1,
+      "segmentation": 2,
+      "image_matting": 3
+    },
+    "missing_tasks": [],
+    "complete": true,
+    "attempted": 13,
+    "required": 13,
+    "failed": 0,
+    "elapsed_s": 14.05,
+    "minimum_real_models": 13,
+    "exit_code": 0
+  },
+  "general_strict": {
+    "schema_version": 1,
+    "real_candidates": 1409,
+    "validated_unique": 1409,
+    "duplicates": 0,
+    "excluded": 0,
+    "by_source": {
+      "pytorchcv": 477,
+      "segmentation_models": 255,
+      "timm": 615,
+      "torchaudio": 3,
+      "torchsr": 27,
+      "torchvision": 11,
+      "transformers": 21
+    },
+    "by_task": {
+      "classification": 1082,
+      "segmentation": 260,
+      "detection": 9,
+      "pose_estimation": 1,
+      "audio_separation": 1,
+      "speech_recognition": 2,
+      "super_resolution": 27,
+      "video_classification": 5,
+      "optical_flow": 2,
+      "language_modeling": 5,
+      "question_answering": 4,
+      "text_classification": 4,
+      "token_classification": 4,
+      "depth_estimation": 1,
+      "text_generation": 1,
+      "time_series_forecasting": 1
+    },
+    "missing_tasks": [],
+    "complete": true,
+    "attempted": 1409,
+    "required": 1409,
+    "failed": 0,
+    "elapsed_s": 152.7,
+    "minimum_real_models": 1001,
+    "exit_code": 0
+  },
+  "tests": {
+    "base_local": 140,
+    "paddle_server": 145,
+    "torch_server": 145,
+    "paddle_server_exit_code": 0,
+    "torch_server_exit_code": 0,
+    "paddle_four_task_smoke_exit_code": 0,
+    "github_hosted_ci": "pending",
+    "clean_install_exit_code": 0,
+    "clean_pip_check": "No broken requirements found.",
+    "clean_console_four_task_smoke_exit_code": 0,
+    "source_setup_actual_sparse_checkout_exit_code": 0
+  },
+  "device_validation": "not performed; CPU source-framework and ONNX checks on the provided A100 host",
+  "comparison": {
+    "atol": 0.001,
+    "rtol": 0.001,
+    "integer_and_bool": "exact",
+    "all_outputs": true,
+    "nonfinite": "fail"
+  },
+  "reference_timing": "Original Paddle outputs captured and copied before static export.",
+  "integer_arithmetic_probe": "Known discrepancy in pinned Paddle/Paddle2ONNX must be rejected as export_mismatch; fixture excluded from real-model counts.",
+  "exploratory_upstream_revision": {
+    "paddledetection": "f049a01a94ccd5addf780641da3ffff276b60083"
+  },
+  "synthetic": {
+    "positive": 548,
+    "negative": 18,
+    "included_in_real_count": false
+  },
+  "packaging_and_constraints_normalized_sha256": {
+    "pyproject.toml": "00723d0c5c3828670236c11acf870cc312773dc1727a92a29a8f4515c00f733b",
+    "configs\\constraints-paddle.txt": "5abfeca094cfbd974c2f0b0ca55aae29eb848012ee1b8a3764de9cbc48fb4d62"
+  }
+}

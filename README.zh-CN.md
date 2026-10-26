@@ -1,9 +1,9 @@
 # InfiniTensor-Test
 
-[真实网络固定清单](catalogs/real-networks.json)已扩充至 **1409 个去重网络配置、16 种任务**，
-新增文本、音频、视频、光流、深度估计、超分辨率和时间序列等任务，全部通过 ONNX 检查、参考执行及
-PyTorch/ONNX 全部输出比较。原有 548 个合成正例与 18 个负例另计。
-安装、来源、计数规则和完整复验见[多任务网络扩充说明](docs/task-expansion.md)。
+[通用清单](catalogs/real-networks.json)与[飞桨清单](catalogs/paddle-networks.json)合计
+**1422 个去重网络配置、21 种任务**（1409 + 13），新增 OCR、表格结构、图像抠图等任务，
+全部通过 ONNX 检查、参考执行及原始框架/ONNX 全部输出比较。原有 548 个合成正例与 18 个负例另计。
+安装与复验见[多任务网络说明](docs/task-expansion.md)和[飞桨模型接入说明](docs/paddle-models.md)。
 
 本分支合并采集基础与模型有效性修复：来源按需加载、确定性完整包缓存，
 以及 548 个合成正例的 ONNX 检查和 CPU 参考执行、18 个明确负例的按原因拒绝验证。

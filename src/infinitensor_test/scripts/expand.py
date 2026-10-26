@@ -182,6 +182,11 @@ def main(argv=None):
                        "seed": args.seed, "models_dir": str(settings.models_dir),
                        "max_size_bytes": case_limit, "force": args.force,
                        "library_version": spec.metadata["source_library_version"], "code_sha256": digest(code)}
+            if spec.metadata.get("requires_fresh_process"):
+                request["single_model_process"] = True
+            if spec.metadata.get("export_backend") == "paddle":
+                request["paddle_version"] = spec.metadata["paddle_version"]
+                request["paddle2onnx_version"] = spec.metadata["paddle2onnx_version"]
             if (source, spec.name) in manifest_models:
                 request["expected_architecture_sha256"] = manifest_models[(source, spec.name)].get("architecture_sha256")
                 request["expected_inputs_sha256"] = manifest_models[(source, spec.name)].get("inputs_sha256")
@@ -190,9 +195,23 @@ def main(argv=None):
         records, specs = [], []
         merged = {(s.source.value, s.name): s for s in ModelCatalog.load(settings.models_dir)}
         start = time.monotonic()
+        batches, pending = [], []
+        for request in requests:
+            if request.get("single_model_process"):
+                if pending:
+                    batches.append(pending)
+                    pending = []
+                batches.append([request])
+            else:
+                pending.append(request)
+                if len(pending) == args.batch_size:
+                    batches.append(pending)
+                    pending = []
+        if pending:
+            batches.append(pending)
         with ThreadPoolExecutor(max_workers=args.jobs) as executor:
-            futures = [executor.submit(_run_batch, requests[i:i+args.batch_size], root, args.timeout, args.resume and not args.force)
-                       for i in range(0, len(requests), args.batch_size)]
+            futures = [executor.submit(_run_batch, batch, root, args.timeout, args.resume and not args.force)
+                       for batch in batches]
             for future in as_completed(futures):
                 for request, record in future.result():
                     record.update(source=request["source"], name=request["name"])

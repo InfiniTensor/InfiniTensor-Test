@@ -94,7 +94,9 @@ def real_inventory(specs):
         if (spec.metadata.get("model_kind") != "real_network" or not spec.path or not spec.path.is_file() or spec.is_skipped
                 or row["validation"].get("reference") != "passed"
                 or (spec.metadata.get("export_backend") == "torch" and
-                    row["validation"].get("torch_reference", {}).get("state") != "passed")):
+                    row["validation"].get("torch_reference", {}).get("state") != "passed")
+                or (spec.metadata.get("export_backend") == "paddle" and
+                    row["validation"].get("paddle_reference", {}).get("state") != "passed")):
             row["state"] = "excluded"
             excluded.append(row)
             continue

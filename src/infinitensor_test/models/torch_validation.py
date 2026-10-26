@@ -1,11 +1,11 @@
 """Check that exporting a real network preserves its reference computation."""
 
-import numpy as np
 import onnx
 import onnxruntime as ort
 
 from .validation import ModelValidationError, prepare_reference_inputs
 from .torch_inputs import ordered_input_names
+from .output_comparison import compare_outputs
 
 
 def flatten_torch_outputs(value):
@@ -35,23 +35,7 @@ def validate_torch_export(model, path, spec, seed):
         if declared is not None and output_names != declared:
             raise ValueError("torch/ONNX output names differ from contract")
         actual = session.run(output_names, inputs)
-        if len(actual) != len(expected):
-            raise ValueError("torch/ONNX output count differs")
-        metrics = []
-        for name, a, b in zip(output_names, actual, expected):
-            if a.shape != b.shape or a.dtype != b.dtype:
-                raise ValueError(f"{name}: torch output {b.shape}/{b.dtype}, ONNX output {a.shape}/{a.dtype}")
-            if not np.isfinite(a).all() or not np.isfinite(b).all():
-                raise ValueError("torch/ONNX output is nonfinite")
-            if np.issubdtype(b.dtype, np.floating):
-                difference = np.abs(a.astype(np.float64) - b.astype(np.float64))
-                passed = bool(np.all(difference <= 1e-3 + 1e-3 * np.abs(b.astype(np.float64))))
-                metrics.append({"name": name, "max_abs_diff": float(difference.max(initial=0)), "passed": passed})
-            else:
-                passed = bool(np.array_equal(a, b))
-                metrics.append({"name": name, "passed": passed})
-            if not passed:
-                raise ValueError("torch/ONNX numerical mismatch (atol=rtol=1e-3)")
+        metrics = compare_outputs(actual, expected, output_names)
         return {"state": "passed", "torch_version": torch.__version__, "outputs": metrics,
                 "atol": 1e-3, "rtol": 1e-3}
     except Exception as error:

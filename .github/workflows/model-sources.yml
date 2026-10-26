@@ -76,3 +76,36 @@ jobs:
             .validation/diverse-smoke/expansion/inventory.json
             .validation/diverse-smoke/expansion/results.json
             .validation/diverse-smoke/expansion/batches/**/worker-*.log
+
+  paddle-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent CPU Paddle environment
+        run: |
+          python -m pip install -e '.[paddle,test]' -c configs/constraints-paddle.txt
+          python -m pip check
+          infinitensor-test-paddle-setup --directory .validation/paddle-repos
+      - name: Validate Paddle exports and four real tasks
+        env:
+          ITEST_PADDLE_REPOS_DIR: ${{ github.workspace }}/.validation/paddle-repos
+          OMP_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+        run: |
+          python -m pytest tests/integration/test_paddle_exports.py -q --junitxml=.validation/paddle-tests.xml
+          infinitensor-test-expand --manifest configs/paddle-source-smoke.json --data-dir .validation/paddle-smoke --offline --minimum-real-models 4 --max-size-mb 768 --jobs 2 --timeout 300
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paddle-network-source-evidence
+          include-hidden-files: true
+          path: |
+            .validation/paddle-tests.xml
+            .validation/paddle-smoke/expansion/inventory.json
+            .validation/paddle-smoke/expansion/results.json
+            .validation/paddle-smoke/expansion/batches/**/worker-*.log

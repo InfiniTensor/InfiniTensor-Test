@@ -10,8 +10,12 @@ from infinitensor_test.artifacts import digest, stable_seed
 from .validation import ModelValidationError
 
 
+def get_input_contract(spec):
+    return spec.metadata.get("input_contract", spec.metadata.get("torch_input_contract"))
+
+
 def contract_arrays(spec, seed):
-    contract = spec.metadata.get("torch_input_contract")
+    contract = get_input_contract(spec)
     if not isinstance(contract, dict) or not contract:
         raise ModelValidationError("input_configuration_error", "empty torch input contract")
     arrays = {}
@@ -43,10 +47,10 @@ def contract_arrays(spec, seed):
 
 def materialize_contract(spec, root, seed):
     """Persist actual NPZ inputs so ONNX validation never guesses token/control values."""
-    if "torch_input_contract" not in spec.metadata:
+    if get_input_contract(spec) is None:
         return
     arrays = contract_arrays(spec, seed)
-    key = digest({"contract": spec.metadata["torch_input_contract"], "seed": seed,
+    key = digest({"contract": get_input_contract(spec), "seed": seed,
                   "case": spec.short_id()})
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
@@ -62,7 +66,7 @@ def materialize_contract(spec, root, seed):
 
 
 def ordered_input_names(spec, available):
-    names = list(spec.metadata.get("torch_input_contract", available))
+    names = list(get_input_contract(spec) or available)
     if set(names) != set(available):
         raise ModelValidationError("input_configuration_error", "torch/ONNX input names differ from contract")
     return names

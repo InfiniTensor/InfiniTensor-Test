@@ -32,6 +32,7 @@ super-resolution = ["torch>=2.0", "torchvision>=0.15", "torchsr>=1.0.4"]
 audio = ["torch>=2.0", "torchaudio>=2.0"]
 text = ["torch>=2.0", "transformers>=4.57.1,<5"]
 diverse = ["torch>=2.0", "torchvision>=0.15", "torchsr>=1.0.4", "torchaudio>=2.0", "transformers>=4.57.1,<5"]
+paddle = ["paddlepaddle==3.0.0", "paddle2onnx==2.0.1", "numpy<2", "protobuf>=3.20.2,<5", "setuptools<81", "opencv-python-headless>=4.8,<4.12", "shapely", "pyclipper", "rapidfuzz", "scipy", "scikit-learn", "scikit-image", "filelock", "prettytable", "pymatting", "visualdl"]
 huggingface = ["huggingface_hub>=0.16"]
 full = [
     "pytorchcv>=0.0.74",
@@ -50,6 +51,7 @@ full = [
 [project.scripts]
 infinitensor-test-collect = "infinitensor_test.scripts.collect:main"
 infinitensor-test-expand = "infinitensor_test.scripts.expand:main"
+infinitensor-test-paddle-setup = "infinitensor_test.scripts.setup_paddle:main"
 infinitensor-test-run = "infinitensor_test.scripts.run:main"
 infinitensor-test-report = "infinitensor_test.scripts.report:main"
 infinitensor-test-compare = "infinitensor_test.scripts.compare:main"

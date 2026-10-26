@@ -52,6 +52,11 @@ class ModelCategory(str, enum.Enum):
     TEXT_GENERATION = "text_generation"
     TIME_SERIES_FORECASTING = "time_series_forecasting"
     DEPTH_ESTIMATION = "depth_estimation"
+    TEXT_DETECTION = "text_detection"
+    TEXT_RECOGNITION = "text_recognition"
+    TEXT_ORIENTATION = "text_orientation"
+    TABLE_STRUCTURE_RECOGNITION = "table_structure_recognition"
+    IMAGE_MATTING = "image_matting"
 
 
 class ModelSource(str, enum.Enum):
@@ -68,6 +73,9 @@ class ModelSource(str, enum.Enum):
     TORCHSR = "torchsr"
     TORCHAUDIO = "torchaudio"
     TRANSFORMERS = "transformers"
+    PADDLEOCR = "paddleocr"
+    PADDLESEG = "paddleseg"
+    PADDLEDETECTION = "paddledetection"
 
 
 @dataclass

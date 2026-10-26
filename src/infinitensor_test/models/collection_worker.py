@@ -16,12 +16,13 @@ from infinitensor_test.models.registry import get_source
 def run_request(request):
     result_path = Path(request["result_path"])
     try:
-        import torch
-        torch.set_num_threads(1)
-        if torch.get_num_interop_threads() != 1:
-            torch.set_num_interop_threads(1)
         params = dict(request["params"], include=[request["name"]], max_parameter_bytes=request["max_size_bytes"])
         spec = next(s for s in get_source(request["source"])(params) if s.name == request["name"])
+        if spec.metadata.get("export_backend") == "torch":
+            import torch
+            torch.set_num_threads(1)
+            if torch.get_num_interop_threads() != 1:
+                torch.set_num_interop_threads(1)
         ok = _materialize_one(spec, Path(request["models_dir"]), request["max_size_bytes"],
                               request["force"], request["seed"])
         state = "valid" if ok else "excluded" if spec.is_skipped else "failed"
