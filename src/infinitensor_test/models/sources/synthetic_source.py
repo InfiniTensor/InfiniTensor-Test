@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import itertools
 import hashlib
+from copy import deepcopy
 from pathlib import Path
 from typing import List
 
@@ -59,19 +60,20 @@ def _save_model(name: str, nodes, inits, in_shape, out_shape) -> onnx.ModelProto
     """Build a model with the last node's output renamed to 'y' (so that
     the OnnxStub in InfiniTensor can find tensors['y'] when the graph
     declares it as an output)."""
+    nodes, inits = deepcopy(nodes), deepcopy(inits)
     if nodes:
         nodes[-1].output[0] = "y"
-    output_info = helper.make_tensor_value_info("y", TensorProto.FLOAT, out_shape)
     graph = helper.make_graph(
         nodes,
         f"g_{name}",
         [helper.make_tensor_value_info("x", TensorProto.FLOAT, in_shape)],
-        [output_info],
+        [helper.make_tensor_value_info(n, TensorProto.FLOAT, None) for n in nodes[-1].output],
         inits,
     )
     # Use the IR required by our opset instead of the installed ONNX release's
     # newest IR, which may not yet be supported by ONNX Runtime.
-    return helper.make_model_gen_version(graph, opset_imports=[helper.make_opsetid("", 18)])
+    model = helper.make_model_gen_version(graph, opset_imports=[helper.make_opsetid("", 18)])
+    return model
 
 
 def _t(arr, name):
@@ -120,12 +122,15 @@ def _shape_specs() -> List[ModelSpec]:
     # Squeeze / Unsqueeze
     for in_s in [(1, 1, 8, 8), (1, 3, 1, 8), (1, 8, 1, 1)]:
         for axes in [[0], [1], [2], [3], [0, 1], [1, 3]]:
-            nodes = [helper.make_node("Squeeze", ["x"], ["y"], axes=axes)]
-            out.append(_spec(f"squeeze_{in_s}_a{axes}", in_s, None, [], nodes, ModelCategory.SHAPE_OPS))
+            nodes = [helper.make_node("Squeeze", ["x", "axes"], ["y"])]
+            reason = "squeeze_nonunit_axis" if any(in_s[a] != 1 for a in axes) else None
+            out.append(_spec(f"squeeze_{in_s}_a{axes}", in_s, None,
+                             [_i(np.array(axes), "axes")], nodes, ModelCategory.SHAPE_OPS, reason))
     for in_s in [(1, 8, 8), (8, 8, 8), (3, 8)]:
         for axes in [[0], [1], [2], [0, 1], [0, 2]]:
-            nodes = [helper.make_node("Unsqueeze", ["x"], ["y"], axes=axes)]
-            out.append(_spec(f"unsqueeze_{in_s}_a{axes}", in_s, None, [], nodes, ModelCategory.SHAPE_OPS))
+            nodes = [helper.make_node("Unsqueeze", ["x", "axes"], ["y"])]
+            out.append(_spec(f"unsqueeze_{in_s}_a{axes}", in_s, None,
+                             [_i(np.array(axes), "axes")], nodes, ModelCategory.SHAPE_OPS))
     # Identity
     for in_s in [(1, 8, 8), (1, 3, 224, 224), (8,)]:
         nodes = [helper.make_node("Identity", ["x"], ["y"])]
@@ -176,7 +181,8 @@ def _matmul_specs() -> List[ModelSpec]:
             helper.make_node("MatMul", ["x", "w"], ["mm"]),
             helper.make_node("Add", ["mm", "b"], ["y"]),
         ]
-        out.append(_spec(f"matmul_{m}x{k}x{n_dim}_in_{(1, m)}", [1, m], [1, n_dim], inits, nodes, ModelCategory.MLP))
+        # Preserve the legacy case ID; the authoritative dimensions are input_shape.
+        out.append(_spec(case, [m, k], [m, n_dim], inits, nodes, ModelCategory.MLP))
     # Gemm with various alpha/beta/transB
     for alpha, beta, transB in [(1.0, 1.0, 0), (0.5, 0.5, 1), (2.0, 0.0, 0), (1.0, 1.0, 1)]:
         w = (_random([8, 8], f"gemm_a{alpha}_b{beta}_t{transB}", "w") * 0.1).astype(np.float32)
@@ -215,8 +221,8 @@ def _activation_specs() -> List[ModelSpec]:
                 nodes = [helper.make_node(op, ["x"], ["y"], axis=axis)]
                 out.append(_spec(f"{op}_{in_s}_a{axis}", in_s, None, [], nodes, ModelCategory.ACTIVATION))
     for in_s in [(1, 8, 8), (1, 3, 224, 224)]:
-        inits = [_i(np.array([0.0], dtype=np.float32), "min"),
-                 _i(np.array([6.0], dtype=np.float32), "max")]
+        inits = [_t(np.array(0.0, dtype=np.float32), "min"),
+                 _t(np.array(6.0, dtype=np.float32), "max")]
         nodes = [helper.make_node("Clip", ["x", "min", "max"], ["y"])]
         out.append(_spec(f"clip_{in_s}", in_s, None, inits, nodes, ModelCategory.ACTIVATION))
     return out
@@ -236,7 +242,8 @@ def _pool_specs() -> List[ModelSpec]:
                                                kernel_shape=[k, k], strides=[s, s],
                                                pads=[p, p, p, p])]
                     out.append(_spec(f"{op}_k{k}_s{s}_p{p}",
-                                      [1, 8, 16, 16], None, [], nodes, ModelCategory.POOLING))
+                                      [1, 8, 16, 16], None, [], nodes, ModelCategory.POOLING,
+                                      "pool_padding_out_of_range" if p >= k else None))
     for op in ["GlobalAveragePool", "GlobalMaxPool"]:
         for in_s in [(1, 4, 8, 8), (1, 8, 16, 16), (1, 16, 32, 32)]:
             nodes = [helper.make_node(op, ["x"], ["y"])]
@@ -273,12 +280,12 @@ def _slice_specs() -> List[ModelSpec]:
     for in_s in [(1, 8, 16), (1, 4, 16, 16), (1, 16, 16, 16)]:
         axes = list(range(len(in_s)))
         starts = [0] * len(in_s)
-        ends = [s // 2 for s in in_s[1:]] + [in_s[0]]
+        ends = [max(1, s // 2) for s in in_s]
         inits = [_i(np.array(axes, dtype=np.int64), "ax"),
                  _i(np.array(starts, dtype=np.int64), "st"),
                  _i(np.array(ends, dtype=np.int64), "en"),
                  _i(np.array([1] * len(in_s), dtype=np.int64), "stp")]
-        nodes = [helper.make_node("Slice", ["x", "ax", "st", "en", "stp"], ["y"])]
+        nodes = [helper.make_node("Slice", ["x", "st", "en", "ax", "stp"], ["y"])]
         out.append(_spec(f"slice_{in_s}", in_s, None, inits, nodes, ModelCategory.SHAPE_OPS))
     for in_s in [(8, 8), (16, 8), (4, 8, 8)]:
         idx = np.array([0, 1, 2], dtype=np.int64)
@@ -295,7 +302,8 @@ def _slice_specs() -> List[ModelSpec]:
     for axis in [0, 1, 2, 3]:
         for in_s in [(1, 8, 8, 8), (1, 4, 4, 4)]:
             nodes = [helper.make_node("Split", ["x"], ["y", "y2"], axis=axis, num_outputs=2)]
-            out.append(_spec(f"split_a{axis}_{in_s}", in_s, None, [], nodes, ModelCategory.SHAPE_OPS))
+            out.append(_spec(f"split_a{axis}_{in_s}", in_s, None, [], nodes, ModelCategory.SHAPE_OPS,
+                             "split_outputs_exceed_dimension" if in_s[axis] < 2 else None))
     return out
 
 
@@ -372,7 +380,7 @@ def _template_specs() -> List[ModelSpec]:
         nodes = []
         cur = "x"
         for i in range(depth):
-            w = (_random([dim, dim if i > 0 else 8], f"mlp_d{depth}_d{dim}", f"w{i}") * 0.1).astype(np.float32)
+            w = (_random([dim if i > 0 else 8, dim], f"mlp_d{depth}_d{dim}", f"w{i}") * 0.1).astype(np.float32)
             b = np.zeros(dim, dtype=np.float32)
             inits += [_t(w, f"w{i}"), _t(b, f"b{i}")]
             nodes.append(helper.make_node("MatMul", [cur, f"w{i}"], [f"m{i}"]))
@@ -387,7 +395,8 @@ def _template_specs() -> List[ModelSpec]:
         wv = (_random([d, d], f"attn_d{d}", "wv") * 0.05).astype(np.float32)
         wo = (_random([d, d], f"attn_d{d}", "wo") * 0.05).astype(np.float32)
         b = np.zeros(d, dtype=np.float32)
-        inits = [_t(wq, "wq"), _t(b, "bq"),
+        inits = [_t(np.array(1.0 / np.sqrt(d)), "scale"),
+                 _t(wq, "wq"), _t(b, "bq"),
                  _t(wk, "wk"), _t(b, "bk"),
                  _t(wv, "wv"), _t(b, "bv"),
                  _t(wo, "wo"), _t(b, "bo")]
@@ -398,7 +407,9 @@ def _template_specs() -> List[ModelSpec]:
             helper.make_node("Add", ["k", "bk"], ["ka"]),
             helper.make_node("MatMul", ["x", "wv"], ["v"]),
             helper.make_node("Add", ["v", "bv"], ["va"]),
-            helper.make_node("MatMul", ["qa", "ka"], ["scores"]),
+            helper.make_node("Transpose", ["ka"], ["kt"], perm=[0, 2, 1]),
+            helper.make_node("MatMul", ["qa", "kt"], ["raw_scores"]),
+            helper.make_node("Mul", ["raw_scores", "scale"], ["scores"]),
             helper.make_node("Softmax", ["scores"], ["attn"], axis=-1),
             helper.make_node("MatMul", ["attn", "va"], ["ctx"]),
             helper.make_node("MatMul", ["ctx", "wo"], ["co"]),
@@ -452,7 +463,8 @@ def _norm_specs() -> List[ModelSpec]:
 # Spec dispatch
 # ---------------------------------------------------------------------------
 
-def _spec(name: str, in_shape, out_shape, inits, nodes, category: ModelCategory) -> ModelSpec:
+def _spec(name: str, in_shape, out_shape, inits, nodes, category: ModelCategory,
+          rejection_reason=None) -> ModelSpec:
     """Wrap a synthetic ONNX construction into a ModelSpec.
 
     The factory closes over the parameters; the collector calls it and writes
@@ -464,6 +476,8 @@ def _spec(name: str, in_shape, out_shape, inits, nodes, category: ModelCategory)
 
     def factory():
         m = _save_model(name, nodes, inits, in_shape, out_shape)
+        if not rejection_reason:
+            m = onnx.shape_inference.infer_shapes(m, strict_mode=True)
         return ("onnx", m)
 
     return ModelSpec(
@@ -474,8 +488,10 @@ def _spec(name: str, in_shape, out_shape, inits, nodes, category: ModelCategory)
         input_shape=in_shape,
         tags=["synthetic", category.value],
         size_hint_bytes=0,
+        expected_rejection=bool(rejection_reason),
+        rejection_reason=rejection_reason,
         metadata={
-            "generator_version": 2,
+            "generator_version": 3,
             "definition_sha256": digest({
                 "inputs": in_shape, "outputs": out_shape,
                 "nodes": [hashlib.sha256(n.SerializeToString()).hexdigest() for n in nodes],

@@ -150,6 +150,10 @@ class TestEngine:
 
     def run_one(self, spec: ModelSpec, suite: Optional[str] = None) -> TestResult:
         """Run one model. Always returns a TestResult; never raises."""
+        if spec.expected_rejection:
+            return TestResult(uuid.uuid4().hex[:16], spec.name, spec.source.value,
+                              spec.category.value, str(spec.path or ""), spec.size_hint_bytes,
+                              TestStatus.SKIP, error_message="negative fixture; collection validation only")
         onnx, OnnxStub, backend_mod = _import_infinitensor()
         run_id = uuid.uuid4().hex[:16]
         rng = np.random.default_rng(self.seed)
@@ -299,7 +303,7 @@ class TestEngine:
         run_id = uuid.uuid4().hex[:12]
         started_at = time.time()
         results: List[TestResult] = []
-        specs = list(catalog.specs)
+        specs = [spec for spec in catalog.specs if not spec.expected_rejection]
         if limit:
             specs = specs[:limit]
         n = len(specs)

@@ -80,6 +80,9 @@ class ModelSpec:
     metadata: Dict[str, Any] = field(default_factory=dict)
     # Source plugin id differs from its family, e.g. synthetic_shape.
     source_id: Optional[str] = None
+    # Deliberately invalid fixtures are validated separately and never executed.
+    expected_rejection: bool = False
+    rejection_reason: Optional[str] = None
 
     def __post_init__(self):
         self.source = ModelSource(self.source)
@@ -87,6 +90,10 @@ class ModelSpec:
         self.format = ModelFormat(self.format)
         if self.path is not None:
             self.path = Path(self.path)
+        if not isinstance(self.expected_rejection, bool):
+            raise ValueError("expected_rejection must be a boolean")
+        if self.expected_rejection != bool(self.rejection_reason):
+            raise ValueError("negative fixtures require a nonempty rejection_reason")
 
     @property
     def is_skipped(self) -> bool:

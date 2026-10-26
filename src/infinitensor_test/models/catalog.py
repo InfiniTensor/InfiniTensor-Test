@@ -78,12 +78,15 @@ class ModelCatalog:
         include_skipped: bool = False,
         max_size_bytes: Optional[int] = None,
         limit: Optional[int] = None,
+        include_negatives: bool = False,
     ) -> "ModelCatalog":
         """Return a new catalog with the matching subset."""
         import fnmatch
 
         out: List[ModelSpec] = []
         for s in self.specs:
+            if s.expected_rejection and not include_negatives:
+                continue
             if not include_skipped and s.is_skipped:
                 continue
             if sources and not any(
@@ -127,6 +130,10 @@ class ModelCatalog:
         return {
             "total": len(self.specs),
             "skipped": sum(1 for s in self.specs if s.is_skipped),
+            "positive": sum(not s.expected_rejection for s in self.specs),
+            "negative": sum(s.expected_rejection for s in self.specs),
+            "negative_rejected": sum(s.expected_rejection and
+                s.metadata.get("validation", {}).get("state") == "expected_rejection" for s in self.specs),
             "by_source": {k.split(":", 1)[1]: v for k, v in c.items() if k.startswith("source:")},
             "by_category": {k.split(":", 1)[1]: v for k, v in c.items() if k.startswith("category:")},
         }

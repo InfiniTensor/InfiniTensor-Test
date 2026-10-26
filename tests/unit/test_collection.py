@@ -201,7 +201,7 @@ def test_cache_reuse_version_seed_and_definition_invalidation(tmp_path):
     one(version=2, definition="b", seed=43)
     assert len(calls) == 4
     stamp = json.loads((b.path.parents[1] / "manifest.json").read_text(encoding="utf-8"))
-    assert stamp["validation"]["reference"] == "not_run"
+    assert stamp["validation"]["reference"] == "passed"
 
 
 def test_legacy_unnamed_cache_is_not_reused_or_deleted(tmp_path):

@@ -31,6 +31,8 @@ log = logging.getLogger(__name__)
 def _gather_model_paths(model_catalog: ModelCatalog, model_glob: Optional[str]) -> List[str]:
     out = []
     for m in model_catalog:
+        if m.expected_rejection:
+            continue
         if m.path is None or not m.path.exists():
             continue
         if model_glob:

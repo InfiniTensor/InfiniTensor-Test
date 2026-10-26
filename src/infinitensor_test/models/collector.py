@@ -2,7 +2,7 @@
 
 Published generations are immutable. Failed or interrupted exports cannot
 replace the last valid package. No exporter cleans a shared model directory.
-This PR validates ONNX structure and shapes, not reference/device numerics.
+Every positive package must pass ONNX checks and CPU reference execution.
 """
 
 from contextlib import contextmanager, redirect_stdout
@@ -18,15 +18,18 @@ import time
 
 import numpy as np
 import onnx
+import onnxruntime as ort
 
 from infinitensor_test.artifacts import atomic_json, copy_package, digest, model_manifest, stable_seed
 from infinitensor_test.models.catalog import ModelCatalog
 from infinitensor_test.models.registry import OptionalDependencyError
+from infinitensor_test.models.validation import (ModelValidationError, input_file_digest,
+                                                 validate_reference)
 
 
 # Bump when export/validation policy changes. Unversioned legacy caches are
 # deliberately never reused. Synthetic generators carry a separate version.
-GENERATOR_VERSION = 1
+GENERATOR_VERSION = 2
 
 
 @contextmanager
@@ -50,12 +53,10 @@ def factory_seed(spec, seed):
         random.setstate(python_state)
 
 
-def validate_model(path):
+def validate_model(path, spec=None, seed=42):
     # Check paths/existence before ONNX follows external references.
     manifest = model_manifest(path)
-    onnx.checker.check_model(str(path), full_check=True)
-    return manifest, {"state": "valid", "checker": "onnx_full_check",
-                      "onnx_version": onnx.__version__, "reference": "not_run"}
+    return manifest, validate_reference(path, spec, seed)
 
 
 def _export_torch_to_onnx(model, dst, input_shape):
@@ -123,7 +124,8 @@ def _staging_package(root):
 def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
     root = _package_root(spec, models_dir)
     current = root / "current.json"
-    spec.metadata.pop("collection_error", None)
+    for key in ("collection_error", "collection_error_code", "validation", "model_sha256", "cache_hit"):
+        spec.metadata.pop(key, None)
     spec.skip_reason = None
     try:
         origin = None
@@ -136,6 +138,8 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
                 origin = _origin_digest(spec.path)
         cache_key = digest({
             "collector_version": GENERATOR_VERSION, "onnx_version": onnx.__version__,
+            "onnxruntime_version": ort.__version__, "input_file_sha256": input_file_digest(spec),
+            "expected_rejection": spec.expected_rejection, "rejection_reason": spec.rejection_reason,
             "numpy_version": np.__version__, "seed": seed,
             "source": spec.source.value, "name": spec.name,
             "input_shape": spec.input_shape, "num_classes": spec.num_classes,
@@ -155,7 +159,7 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
                     target = (package / stamp["model_file"]).resolve()
                     if not target.is_relative_to(package / "files"):
                         raise ValueError("cached main file escapes package")
-                    manifest, validation = validate_model(target)
+                    manifest, validation = validate_model(target, spec, seed)
                     if manifest == stamp["model"] and validation == stamp["validation"]:
                         if manifest["size_bytes"] > max_size_bytes:
                             spec.path = None
@@ -191,7 +195,7 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
                 dst = _copy_into_stage(spec.path, stage)
             else:
                 raise ValueError("no factory and no existing model path")
-            manifest, validation = validate_model(dst)
+            manifest, validation = validate_model(dst, spec, seed)
             spec.size_hint_bytes = manifest["size_bytes"]
             if manifest["size_bytes"] > max_size_bytes:
                 spec.path = None
@@ -215,6 +219,8 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
     except Exception as error:
         spec.path = None
         spec.metadata["collection_error"] = f"{type(error).__name__}: {error}"
+        spec.metadata["collection_error_code"] = (
+            error.stage if isinstance(error, ModelValidationError) else "collection_failure")
         return False
 
 
@@ -228,7 +234,8 @@ def collect(catalog, settings, sources=None, force=False, progress=True, limit=N
     if limit is not None:
         selected = selected[:limit]
     counts = {"total": len(selected), "added": 0, "cached": 0,
-              "generated": 0, "skipped": 0, "failed": 0}
+              "generated": 0, "skipped": 0, "failed": 0,
+              "positive_validated": 0, "negative_rejected": 0, "errors_by_stage": {}}
     start = time.monotonic()
     for index, spec in enumerate(selected):
         if spec.is_skipped and spec.skip_reason != "size_limit":
@@ -241,6 +248,10 @@ def collect(catalog, settings, sources=None, force=False, progress=True, limit=N
         counts["added" if ok else "skipped" if spec.is_skipped else "failed"] += 1
         if ok:
             counts["cached" if spec.metadata["cache_hit"] else "generated"] += 1
+            counts["negative_rejected" if spec.expected_rejection else "positive_validated"] += 1
+        elif not spec.is_skipped:
+            stage = spec.metadata.get("collection_error_code", "collection_failure")
+            counts["errors_by_stage"][stage] = counts["errors_by_stage"].get(stage, 0) + 1
         if progress and (index % 50 == 0 or index == len(selected) - 1):
             print(f"[{index + 1}/{len(selected)}] collected={counts['added']} "
                   f"failed={counts['failed']} skipped={counts['skipped']}", file=sys.stderr)
