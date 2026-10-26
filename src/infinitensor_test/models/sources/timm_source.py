@@ -19,6 +19,7 @@ from infinitensor_test.models.spec import (
     ModelSource,
 )
 from infinitensor_test.models.registry import register_source
+from .network_common import create_bounded_model, provenance
 
 
 # Default filter to skip huge / weird / pretrained-only models
@@ -69,13 +70,14 @@ def _make_timm_specs(
     exclude: List[str] = None,
     skip_patterns: List[str] = None,
     max_size_mb: int = 80,
+    max_parameter_bytes=None,
 ) -> List[ModelSpec]:
     """Build specs for all matching timm models."""
     import timm
 
-    skip_patterns = list(skip_patterns or _DEFAULT_SKIP)
+    skip_patterns = list(_DEFAULT_SKIP if skip_patterns is None else skip_patterns)
     specs: List[ModelSpec] = []
-    all_models = timm.list_models()
+    all_models = timm.list_models(include_tags=False)
     for m in all_models:
         if not timm.is_model(m):
             continue
@@ -88,18 +90,24 @@ def _make_timm_specs(
 
         def factory(name=m):
             import timm as _timm
-            return _timm.create_model(name, pretrained=False, num_classes=1000)
+            return create_bounded_model(_timm.create_model,
+                                        {"model_name": name, "pretrained": False, "num_classes": 1000, "exportable": True},
+                                        max_parameter_bytes)
+
+        config = timm.get_pretrained_cfg(m)
+        input_size = getattr(config, "input_size", None)
 
         spec = ModelSpec(
             name=m,
             source=ModelSource.TIMM,
             category=_categorize(m),
             factory=factory,
-            input_shape=[1, 3, 224, 224],
+            input_shape=[1, *input_size] if input_size else None,
             tags=_classify_tags(m),
             size_hint_bytes=0,
             num_classes=1000,
-            metadata={"max_size_mb": max_size_mb},
+            metadata={**provenance("timm", "https://github.com/huggingface/pytorch-image-models",
+                                  m, "classification"), "max_size_mb": max_size_mb},
         )
         specs.append(spec)
     return specs
@@ -120,6 +128,7 @@ def timm_specs(params: dict) -> List[ModelSpec]:
         exclude=params.get("exclude"),
         skip_patterns=params.get("skip_patterns"),
         max_size_mb=params.get("max_size_mb", 80),
+        max_parameter_bytes=params.get("max_parameter_bytes"),
     )
 
 
@@ -129,4 +138,5 @@ def timm_small_specs(params: dict) -> List[ModelSpec]:
     return _make_timm_specs(
         skip_patterns=_DEFAULT_SKIP,
         max_size_mb=params.get("max_size_mb", 30),
+        max_parameter_bytes=params.get("max_parameter_bytes"),
     )

@@ -22,9 +22,10 @@ import onnxruntime as ort
 
 from infinitensor_test.artifacts import atomic_json, copy_package, digest, model_manifest, stable_seed
 from infinitensor_test.models.catalog import ModelCatalog
-from infinitensor_test.models.registry import OptionalDependencyError
+from infinitensor_test.models.registry import OptionalDependencyError, SourceSizeLimitError
 from infinitensor_test.models.validation import (ModelValidationError, input_file_digest,
                                                  validate_reference)
+from infinitensor_test.models.torch_validation import validate_torch_export
 
 
 # Bump when export/validation policy changes. Unversioned legacy caches are
@@ -99,6 +100,9 @@ def _record(spec, target, manifest, validation, cached):
     spec.size_hint_bytes = manifest["size_bytes"]
     spec.metadata.update(model_sha256=manifest["sha256"], validation=validation,
                          cache_hit=cached, collector_version=GENERATOR_VERSION)
+    inputs = validation.get("inputs", {})
+    if spec.input_shape is None and len(inputs) == 1:
+        spec.input_shape = list(next(iter(inputs.values()))["shape"])
 
 
 @contextmanager
@@ -146,7 +150,9 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
             "generator_version": spec.metadata.get("generator_version", 0),
             "definition_sha256": spec.metadata.get("definition_sha256"),
             "source_params": spec.metadata.get("source_params", {}), "origin": origin,
-            "source_library_version": getattr(sys.modules.get(spec.source.value), "__version__", None),
+            "source_library_version": spec.metadata.get("source_library_version") or
+                getattr(sys.modules.get(spec.source.value), "__version__", None),
+            "torch_version": getattr(sys.modules.get("torch"), "__version__", None),
         })
         if not force and current.is_file():
             try:
@@ -160,7 +166,13 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
                     if not target.is_relative_to(package / "files"):
                         raise ValueError("cached main file escapes package")
                     manifest, validation = validate_model(target, spec, seed)
-                    if manifest == stamp["model"] and validation == stamp["validation"]:
+                    old_validation = dict(stamp["validation"])
+                    parity = old_validation.pop("torch_reference", None)
+                    if spec.metadata.get("export_backend") == "torch" and (not parity or parity.get("state") != "passed"):
+                        raise ValueError("real network cache has no torch/ONNX parity evidence")
+                    if manifest == stamp["model"] and validation == old_validation:
+                        if parity:
+                            validation["torch_reference"] = parity
                         if manifest["size_bytes"] > max_size_bytes:
                             spec.path = None
                             spec.size_hint_bytes = manifest["size_bytes"]
@@ -175,6 +187,7 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
         with _staging_package(root) as (stage, retain):
             (stage / "files").mkdir()
             dst = stage / "files/model.onnx"
+            torch_model = None
             if spec.factory:
                 with factory_seed(spec, seed), redirect_stdout(io.StringIO()):
                     result = spec.factory()
@@ -190,12 +203,28 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
                     elif result is None:
                         raise ValueError("factory returned None")
                     else:
+                        # Bound large source libraries before expensive ONNX export.
+                        parameter_bytes = sum(v.numel() * v.element_size() for v in result.state_dict().values())
+                        spec.metadata["parameter_size_bytes"] = parameter_bytes
+                        if parameter_bytes > max_size_bytes:
+                            spec.path = None
+                            spec.skip_reason = "parameter_size_limit"
+                            return False
+                        if spec.input_shape is None:
+                            size = getattr(result, "in_size", None)
+                            import torch
+                            first_conv = next((m for m in result.modules() if isinstance(m, torch.nn.Conv2d)), None)
+                            if size is not None and len(size) == 2 and first_conv is not None:
+                                spec.input_shape = [1, first_conv.in_channels, *size]
                         _export_torch_to_onnx(result, dst, spec.input_shape)
+                        torch_model = result
             elif spec.path and spec.path.is_file():
                 dst = _copy_into_stage(spec.path, stage)
             else:
                 raise ValueError("no factory and no existing model path")
             manifest, validation = validate_model(dst, spec, seed)
+            if torch_model is not None and spec.metadata.get("model_kind") == "real_network":
+                validation["torch_reference"] = validate_torch_export(torch_model, dst, spec, seed)
             spec.size_hint_bytes = manifest["size_bytes"]
             if manifest["size_bytes"] > max_size_bytes:
                 spec.path = None
@@ -216,6 +245,11 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
             return True
     except OptionalDependencyError:
         raise
+    except SourceSizeLimitError as error:
+        spec.path = None
+        spec.metadata["parameter_size_bytes"] = error.size_bytes
+        spec.skip_reason = "parameter_size_limit"
+        return False
     except Exception as error:
         spec.path = None
         spec.metadata["collection_error"] = f"{type(error).__name__}: {error}"
@@ -238,7 +272,7 @@ def collect(catalog, settings, sources=None, force=False, progress=True, limit=N
               "positive_validated": 0, "negative_rejected": 0, "errors_by_stage": {}}
     start = time.monotonic()
     for index, spec in enumerate(selected):
-        if spec.is_skipped and spec.skip_reason != "size_limit":
+        if spec.is_skipped and spec.skip_reason not in ("size_limit", "parameter_size_limit"):
             counts["skipped"] += 1
             continue
         cap = settings.max_model_size_bytes

@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "models": [
+    {"source": "timm", "name": "mobilenetv2_050"},
+    {"source": "pytorchcv", "name": "resnet20_cifar10"},
+    {"source": "segmentation_models", "name": "unet__mobilenet_v2"}
+  ]
+}

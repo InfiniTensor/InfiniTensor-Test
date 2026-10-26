@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "libraries": {
+    "torch": "2.9.1+cpu",
+    "torchvision": "0.24.1+cpu",
+    "numpy": "1.26.4",
+    "onnx": "1.17.0",
+    "onnxruntime": "1.20.1",
+    "timm": "1.0.22",
+    "pytorchcv": "0.0.74",
+    "segmentation-models-pytorch": "0.5.0"
+  },
+  "candidates": 2595,
+  "candidate_states": {
+    "valid": 1487,
+    "excluded": 871,
+    "failed": 237
+  },
+  "failed_by_stage": {
+    "export_mismatch": 74,
+    "collection_failure": 111,
+    "reference_failure": 50,
+    "invalid_model": 2
+  },
+  "validated_unique": 1347,
+  "duplicates": 140,
+  "by_source": {
+    "pytorchcv": 477,
+    "segmentation_models": 255,
+    "timm": 615
+  },
+  "by_task": {
+    "classification": 1082,
+    "segmentation": 260,
+    "detection": 4,
+    "pose_estimation": 1
+  },
+  "device_validation": "not performed; CPU export/reference checks on the provided A100 host",
+  "comparison": {
+    "atol": 0.001,
+    "rtol": 0.001,
+    "all_outputs": true,
+    "nonfinite": "fail"
+  },
+  "date": "2026-10-27",
+  "manifest": "catalogs/real-networks.json",
+  "strict_replay": {
+    "attempted": 1347,
+    "validated_unique": 1347,
+    "failed": 0,
+    "excluded": 0,
+    "duplicates": 0,
+    "complete": true,
+    "exit_code": 0,
+    "required": 1347,
+    "elapsed_s": 110.27,
+    "cache_policy": "Reuse content-verified model packages and recorded reference checks; initial screening executed export and parity per candidate. Use --force for fresh export and reference execution."
+  },
+  "synthetic": {
+    "positive": 548,
+    "negative": 18,
+    "included_in_real_count": false
+  },
+  "manifest_payload_sha256": "0d55b175f14b2c07761737cfb1c7df6f09daeadb5cea3946d39e4d1ae3757cfc",
+  "source_and_tests_normalized_sha256": "1bc03618546380e9ba876ca2e3477f3f7ca5226a3136ede173ece4a44a695068",
+  "tests": {
+    "unit_and_operator_tests": 116,
+    "server_exit_code": 0,
+    "local_exit_code": 0,
+    "source_smoke_validated_unique": 3,
+    "source_smoke_exit_code": 0,
+    "github_hosted_ci": "pending"
+  }
+}

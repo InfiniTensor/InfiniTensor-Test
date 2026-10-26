@@ -45,6 +45,8 @@ class ModelSource(str, enum.Enum):
 
     TORCHVISION = "torchvision"
     TIMM = "timm"
+    PYTORCHCV = "pytorchcv"
+    SEGMENTATION_MODELS = "segmentation_models"
     HUGGINGFACE = "huggingface"
     ONNX_ZOO = "onnx_zoo"
     SYNTHETIC = "synthetic"

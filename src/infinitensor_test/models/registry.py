@@ -13,9 +13,12 @@ _MODULES = {
                  "reduction", "slice", "template", "norm")
 }
 _MODULES.update(torchvision="torchvision_source", timm="timm_source",
+                pytorchcv="pytorchcv_source", segmentation_models="segmentation_source",
                 timm_small="timm_source", huggingface="huggingface_source",
                 onnx_zoo="onnx_zoo_source")
 _DEPENDENCIES = {
+    "pytorchcv": ("pytorchcv", "pytorchcv"),
+    "segmentation_models": ("segmentation_models_pytorch", "segmentation"),
     "torchvision": ("torchvision", "torchvision"),
     "timm": ("timm", "timm"),
     "timm_small": ("timm", "timm"),
@@ -25,6 +28,12 @@ _DEPENDENCIES = {
 
 class OptionalDependencyError(RuntimeError):
     """A selected source cannot initialize its optional dependencies."""
+
+
+class SourceSizeLimitError(ValueError):
+    def __init__(self, size_bytes):
+        self.size_bytes = size_bytes
+        super().__init__(f"network parameters require {size_bytes} bytes")
 
 
 def register_source(source_id):
