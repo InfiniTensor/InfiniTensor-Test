@@ -18,6 +18,7 @@ from infinitensor_test.config import load_settings
 from infinitensor_test.models.catalog import ModelCatalog, _dict_to_spec
 from infinitensor_test.models.inventory import real_inventory
 from infinitensor_test.models.registry import get_source
+from infinitensor_test.models.validation import validation_environment
 
 
 def _run_batch(requests, root, timeout, resume):
@@ -165,6 +166,7 @@ def main(argv=None):
         code_root = Path(__file__).resolve().parents[1]
         code = {str(f.relative_to(code_root)): hashlib.sha256(f.read_bytes()).hexdigest()
                 for f in code_root.rglob("*.py")}
+        environment = validation_environment()
         requests = []
         for source, spec, params in selected:
             source_limit = params.get("max_size_mb", args.max_size_mb)
@@ -181,7 +183,8 @@ def main(argv=None):
             request = {"source": source, "name": spec.name, "params": params,
                        "seed": args.seed, "models_dir": str(settings.models_dir),
                        "max_size_bytes": case_limit, "force": args.force,
-                       "library_version": spec.metadata["source_library_version"], "code_sha256": digest(code)}
+                       "library_version": spec.metadata["source_library_version"], "code_sha256": digest(code),
+                       "validation_environment": environment}
             if spec.metadata.get("requires_fresh_process"):
                 request["single_model_process"] = True
             if spec.metadata.get("export_backend") == "paddle":

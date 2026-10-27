@@ -5,6 +5,13 @@ from infinitensor_test.models.spec import ModelSpec, ModelSource, ModelCategory
 from .network_common import create_bounded_model, provenance, select_names
 
 
+SEGMENTATION_MODULES = frozenset({
+    "bisenet", "cgnet", "contextnet", "dabnet", "danet", "deeplabv3", "edanet",
+    "enet", "erfnet", "esnet", "espcnet", "fastscnn", "fcn8sd", "fpenet",
+    "icnet", "lednet", "linknet", "pspnet", "segnet", "sinet", "sqnet", "unet",
+})
+
+
 @register_source("pytorchcv")
 def pytorchcv_specs(params):
     from pytorchcv import model_provider
@@ -16,15 +23,16 @@ def pytorchcv_specs(params):
         task, category = "classification", ModelCategory.CLASSIFICATION
         if "pose" in module:
             task, category = "pose_estimation", ModelCategory.OTHER
-        elif module in ("fpenet", "enet", "icnet", "dabnet", "cgnet", "bisenet", "danet",
-                        "fastscnn", "lednet", "contextnet", "sinet", "pspnet", "deeplabv3"):
+        elif module in SEGMENTATION_MODULES:
             task, category = "segmentation", ModelCategory.SEGMENTATION
         elif module in ("lffd", "retinaface", "centernet"):
             task, category = "detection", ModelCategory.DETECTION
-        elif module in ("jasper", "quartznet", "wav2letter"):
+        elif module in ("jasper", "jasperdr", "quartznet", "wav2letter"):
             task, category = "speech_recognition", ModelCategory.OTHER
         elif "propainter" in module:
             task, category = "video_inpainting", ModelCategory.OTHER
+        elif module == "voca":
+            task, category = "speech_driven_animation", ModelCategory.OTHER
         def factory(n=name):
             return create_bounded_model(model_provider.get_model, {"name": n, "pretrained": False},
                                         params.get("max_parameter_bytes"))

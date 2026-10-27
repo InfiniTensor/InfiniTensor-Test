@@ -24,7 +24,7 @@ from infinitensor_test.artifacts import atomic_json, copy_package, digest, model
 from infinitensor_test.models.catalog import ModelCatalog
 from infinitensor_test.models.registry import OptionalDependencyError, SourceSizeLimitError
 from infinitensor_test.models.validation import (ModelValidationError, input_file_digest,
-                                                 validate_reference)
+                                                 validate_reference, validation_environment)
 from infinitensor_test.models.torch_validation import flatten_torch_outputs, validate_torch_export
 from infinitensor_test.models.torch_inputs import contract_arrays, materialize_contract
 
@@ -175,10 +175,10 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
             elif spec.path.is_file():
                 origin = _origin_digest(spec.path)
         cache_key = digest({
-            "collector_version": GENERATOR_VERSION, "onnx_version": onnx.__version__,
-            "onnxruntime_version": ort.__version__, "input_file_sha256": input_file_digest(spec),
+            "collector_version": GENERATOR_VERSION,
+            "validation_environment": validation_environment(), "input_file_sha256": input_file_digest(spec),
             "expected_rejection": spec.expected_rejection, "rejection_reason": spec.rejection_reason,
-            "numpy_version": np.__version__, "seed": seed,
+            "seed": seed,
             "source": spec.source.value, "name": spec.name,
             "input_shape": spec.input_shape, "num_classes": spec.num_classes,
             "generator_version": spec.metadata.get("generator_version", 0),
@@ -189,7 +189,6 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
             "source_params": spec.metadata.get("source_params", {}), "origin": origin,
             "source_library_version": spec.metadata.get("source_library_version") or
                 getattr(sys.modules.get(spec.source.value), "__version__", None),
-            "torch_version": getattr(sys.modules.get("torch"), "__version__", None),
             **({"input_contract": spec.metadata.get("input_contract"),
                 "upstream_revision": spec.metadata.get("upstream_revision"),
                 "paddle_version": spec.metadata.get("paddle_version"),

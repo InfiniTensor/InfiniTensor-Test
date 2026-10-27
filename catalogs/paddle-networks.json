@@ -123,7 +123,7 @@
         488,
         488
       ],
-      "architecture_sha256": "30258e44373674ef8a07d1366dd42db8fa1d140fd9b0f0dc45b3f24dfbe38f57",
+      "architecture_sha256": "cd4eac49d1e464fb8a6daf85298cd4eca65a05ceb850896ba0d758bcc24ea646",
       "inputs_sha256": "7cbcded46b9101af63fcb64b8d35cd358b221610bf0bd576e9497961f8c8b86a",
       "max_size_mb": 768,
       "upstream_config": "configs/table/SLANet.yml"
@@ -168,7 +168,7 @@
         488,
         488
       ],
-      "architecture_sha256": "c2c3f4a3aec508d73989b191dc37fef29bc413061c16f0e64c0bd8d0c3c1d038",
+      "architecture_sha256": "ffec20a37bfac04d84d0a5c4fbeba81bc2c717dc893351e7e910f496d6154a77",
       "inputs_sha256": "43ff70e291fe37236718597f4cc3c83e628132c6b9d30bb14e488c8445f46f3b",
       "max_size_mb": 768,
       "upstream_config": "configs/table/table_mv3.yml"

@@ -28,21 +28,21 @@
   },
   "combined_validated_unique": 1409,
   "combined_by_task": {
-    "classification": 1082,
-    "segmentation": 260,
+    "classification": 1076,
+    "segmentation": 266,
     "detection": 9,
     "pose_estimation": 1,
+    "super_resolution": 27,
     "audio_separation": 1,
     "speech_recognition": 2,
-    "super_resolution": 27,
-    "video_classification": 5,
-    "optical_flow": 2,
     "language_modeling": 5,
     "question_answering": 4,
     "text_classification": 4,
     "token_classification": 4,
-    "depth_estimation": 1,
+    "video_classification": 5,
+    "optical_flow": 2,
     "text_generation": 1,
+    "depth_estimation": 1,
     "time_series_forecasting": 1
   },
   "libraries": {
@@ -181,5 +181,213 @@
     "positive": 548,
     "negative": 18,
     "included_in_real_count": false
+  },
+  "review_followup": {
+    "previous_manifest_hashes": {
+      "manifest_payload_sha256": "ce0fccb1a04dec0d961aeabebc8eda8d8941d2393e1c5fbd1668bb732bb110e1",
+      "diverse_manifest_payload_sha256": "2bd2f0082361c49af00b93df22702973668c6a29a32e961b4914f2d6bc206ab4"
+    },
+    "changed_fingerprints": [
+      {
+        "source": "torchvision_tasks",
+        "name": "fasterrcnn_mobilenet_v3_large_320_fpn",
+        "old": "d59da17eea63451f70ca578221f998d0ba23ea37dd248ebb658a61e7ca1f9e3a",
+        "new": "689e723e48890ff04bdc42e5400dd550028b19b5817b8b3526c001e56c1c5abc",
+        "changed": true,
+        "has_subgraphs": true
+      },
+      {
+        "source": "torchvision_tasks",
+        "name": "fasterrcnn_resnet50_fpn",
+        "old": "939821300729030620eee078ab62b15a51df84d4bf7d91cc1f0fc7287fe0b9d0",
+        "new": "105edf7943f338ebf346ff4e420981965cb6680671943a1121c6178bfd7949c9",
+        "changed": true,
+        "has_subgraphs": true
+      },
+      {
+        "source": "torchvision_tasks",
+        "name": "retinanet_resnet50_fpn",
+        "old": "ea72f865002783580dff4f0a70c5069210f0559b21fda44342e7b23308a8c7e7",
+        "new": "e85474ff32a647a70a3f384e51defd98a4e48e4131206ce779f4801575683c20",
+        "changed": true,
+        "has_subgraphs": true
+      },
+      {
+        "source": "torchvision_tasks",
+        "name": "fcos_resnet50_fpn",
+        "old": "4a3ad1f50df105c4f0c2712c0ed9e97e84b1fca7ef95781af44ffa455866e0e3",
+        "new": "73bf625bed3b4b00277f903a4cffaaba473341e08157d44e722a6512659f0203",
+        "changed": true,
+        "has_subgraphs": true
+      }
+    ],
+    "current_general_manifest_payload_sha256": "f95d91d166b4695cf2b01f84302dec8e21fcd59eca07a9333a3522f055fdbbb8",
+    "scope": "Metadata/fingerprint migration only; original full replay evidence below retains its original source and manifest.",
+    "current_diverse_manifest_payload_sha256": "83e6b3a7e2b9419b84f1e235b17dc0300b9038299a0a6f173e21a1b092d01942",
+    "source_and_tests_normalized_sha256": "936de4df48178361a46e8135cfdc6e8a91ff7009d98a7ab347d0d9ae0e76ece5",
+    "output_metadata_migrations": [
+      {
+        "source": "torchvision_tasks",
+        "name": "fasterrcnn_mobilenet_v3_large_320_fpn",
+        "old_scoped_fingerprint": "689e723e48890ff04bdc42e5400dd550028b19b5817b8b3526c001e56c1c5abc",
+        "new": "abc44e92694814b8e0592d92490ca91254d0d0f979fd94c7b153605732073745",
+        "same_inputs": true,
+        "torch_reference": "passed",
+        "reason": "Fresh signed export uses concrete output sizes; cached baseline retained symbolic output descriptions. Computational graph canonical diff is otherwise identical.",
+        "outputs": {
+          "boxes": {
+            "shape": [
+              0,
+              4
+            ],
+            "dtype": "float32",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "labels": {
+            "shape": [
+              0
+            ],
+            "dtype": "int64",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "scores": {
+            "shape": [
+              0
+            ],
+            "dtype": "float32",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      },
+      {
+        "source": "torchvision_tasks",
+        "name": "fasterrcnn_resnet50_fpn",
+        "old_scoped_fingerprint": "105edf7943f338ebf346ff4e420981965cb6680671943a1121c6178bfd7949c9",
+        "new": "696e58fa9026e7fc4e95136891e0c400c14c7e0de6680c28f8e340e55d16d7ca",
+        "same_inputs": true,
+        "torch_reference": "passed",
+        "reason": "Fresh signed export uses concrete output sizes; cached baseline retained symbolic output descriptions. Computational graph canonical diff is otherwise identical.",
+        "outputs": {
+          "boxes": {
+            "shape": [
+              100,
+              4
+            ],
+            "dtype": "float32",
+            "sha256": "2d776897829b63d120232b81a773e012db70e29cb26c465ab50ef382f4792e0d"
+          },
+          "labels": {
+            "shape": [
+              100
+            ],
+            "dtype": "int64",
+            "sha256": "9bc463f5782714d9d67fa58b37bd2be5c0ab6cbc457cb38efca8cf29d29b747d"
+          },
+          "scores": {
+            "shape": [
+              100
+            ],
+            "dtype": "float32",
+            "sha256": "c11e8fdf04ac0f626c4a46cf4c4fe48bd42dd520d4b0fe2f06ae08f978659592"
+          }
+        }
+      },
+      {
+        "source": "torchvision_tasks",
+        "name": "fcos_resnet50_fpn",
+        "old_scoped_fingerprint": "73bf625bed3b4b00277f903a4cffaaba473341e08157d44e722a6512659f0203",
+        "new": "49f99892c37627f20ec8b035db1fdd2597b9d24886867d58bd949e7b14ef58da",
+        "same_inputs": true,
+        "torch_reference": "passed",
+        "reason": "Fresh signed export uses concrete output sizes; cached baseline retained symbolic output descriptions. Computational graph canonical diff is otherwise identical.",
+        "outputs": {
+          "boxes": {
+            "shape": [
+              0,
+              4
+            ],
+            "dtype": "float32",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "labels": {
+            "shape": [
+              0
+            ],
+            "dtype": "int64",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "scores": {
+            "shape": [
+              0
+            ],
+            "dtype": "float32",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      },
+      {
+        "source": "torchvision_tasks",
+        "name": "retinanet_resnet50_fpn",
+        "old_scoped_fingerprint": "e85474ff32a647a70a3f384e51defd98a4e48e4131206ce779f4801575683c20",
+        "new": "0c434fb89b88b09d7f72590d106d5c434090f9a5ff8ced2776b7d4a920933bea",
+        "same_inputs": true,
+        "torch_reference": "passed",
+        "reason": "Fresh signed export uses concrete output sizes; cached baseline retained symbolic output descriptions. Computational graph canonical diff is otherwise identical.",
+        "outputs": {
+          "boxes": {
+            "shape": [
+              0,
+              4
+            ],
+            "dtype": "float32",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "labels": {
+            "shape": [
+              0
+            ],
+            "dtype": "int64",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "scores": {
+            "shape": [
+              0
+            ],
+            "dtype": "float32",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      }
+    ],
+    "smoke": {
+      "schema_version": 1,
+      "real_candidates": 10,
+      "validated_unique": 10,
+      "duplicates": 0,
+      "excluded": 0,
+      "by_source": {
+        "torchaudio": 1,
+        "torchsr": 1,
+        "torchvision": 6,
+        "transformers": 2
+      },
+      "by_task": {
+        "audio_separation": 1,
+        "super_resolution": 1,
+        "detection": 4,
+        "video_classification": 1,
+        "optical_flow": 1,
+        "question_answering": 1,
+        "time_series_forecasting": 1
+      },
+      "missing_tasks": [],
+      "complete": true,
+      "attempted": 10,
+      "required": 10,
+      "failed": 0,
+      "elapsed_s": 15.43,
+      "minimum_real_models": 10,
+      "exit_code": 0
+    }
   }
 }

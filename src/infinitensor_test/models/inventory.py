@@ -33,20 +33,24 @@ def architecture_digest(path):
                 shape.append(None)
         return {"dtype": tensor_type.elem_type, "shape": shape}
 
-    def graph(g, outer=None):
-        names = dict(outer or {})
+    def graph(g, outer=None, scope=""):
+        names = {}
         constants = {t.name: t for t in g.initializer}
         inputs = [v for v in g.input if v.name not in constants]
         for i, v in enumerate(inputs):
-            names[v.name] = f"input{i}"
+            names[v.name] = f"{scope}input{i}"
         initializer_info, nodes = {}, []
         def identify(name):
             if not name:
                 return ""
             if name not in names and name in constants:
-                names[name] = f"constant{len(initializer_info)}"
+                names[name] = f"{scope}constant{len(initializer_info)}"
                 initializer_info[names[name]] = tensor(constants[name])
-            return names.get(name, f"capture:{name}")
+            if name in names:
+                return names[name]
+            # Resolve captures in the enclosing scope, including initializers
+            # that are used exclusively inside a subgraph.
+            return outer(name) if outer is not None else f"capture:{name}"
         for index, node in enumerate(g.node):
             args = [identify(n) for n in node.input]
             attrs = {}
@@ -55,12 +59,15 @@ def architecture_digest(path):
                 if isinstance(value, onnx.TensorProto):
                     value = tensor(value, constant=True)
                 elif isinstance(value, onnx.GraphProto):
-                    value = graph(value, names)
+                    value = graph(value, identify, f"{scope}node{index}/{a.name}/")
+                elif a.type == onnx.AttributeProto.GRAPHS:
+                    value = [graph(v, identify, f"{scope}node{index}/{a.name}/{j}/")
+                             for j, v in enumerate(value)]
                 elif isinstance(value, bytes):
                     value = value.hex()
                 attrs[a.name] = value
             for i, name in enumerate(node.output):
-                names[name] = f"node{index}:{i}"
+                names[name] = f"{scope}node{index}:{i}"
             nodes.append({"op": node.op_type, "domain": node.domain,
                           "inputs": args, "outputs": len(node.output), "attrs": attrs})
         outputs = [{"value": identify(v.name), **value_info(v)} for v in g.output]

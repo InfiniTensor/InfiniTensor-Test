@@ -30,8 +30,8 @@
     "timm": 615
   },
   "by_task": {
-    "classification": 1082,
-    "segmentation": 260,
+    "classification": 1076,
+    "segmentation": 266,
     "detection": 4,
     "pose_estimation": 1
   },
@@ -54,7 +54,10 @@
     "exit_code": 0,
     "required": 1347,
     "elapsed_s": 110.27,
-    "cache_policy": "Reuse content-verified model packages and recorded reference checks; initial screening executed export and parity per candidate. Use --force for fresh export and reference execution."
+    "cache_policy": "Reuse content-verified model packages and recorded reference checks; initial screening executed export and parity per candidate. Use --force for fresh export and reference execution.",
+    "code_revision": "c7430c4c0bb50540ebd19b47aa62c416c38a6b56",
+    "manifest_payload_sha256": "0d55b175f14b2c07761737cfb1c7df6f09daeadb5cea3946d39e4d1ae3757cfc",
+    "source_and_tests_normalized_sha256": "1bc03618546380e9ba876ca2e3477f3f7ca5226a3136ede173ece4a44a695068"
   },
   "synthetic": {
     "positive": 548,
@@ -62,15 +65,444 @@
     "included_in_real_count": false
   },
   "manifest_payload_sha256": "0d55b175f14b2c07761737cfb1c7df6f09daeadb5cea3946d39e4d1ae3757cfc",
-  "source_and_tests_normalized_sha256": "1bc03618546380e9ba876ca2e3477f3f7ca5226a3136ede173ece4a44a695068",
+  "source_and_tests_normalized_sha256": "936de4df48178361a46e8135cfdc6e8a91ff7009d98a7ab347d0d9ae0e76ece5",
   "tests": {
-    "unit_and_operator_tests": 116,
+    "unit_and_operator_tests": 170,
     "server_exit_code": 0,
     "local_exit_code": 0,
     "source_smoke_validated_unique": 3,
     "source_smoke_exit_code": 0,
-    "github_hosted_ci": "pending"
+    "github_hosted_ci": "pending for review fixes"
   },
-  "scope": "Initial 1347-network expansion at commit c7430c4; see task-expansion-results.json for current combined corpus.",
-  "manifest_revision": "c7430c4c0bb50540ebd19b47aa62c416c38a6b56"
+  "review_followup": {
+    "reviewed_revision": "c7430c4c0bb50540ebd19b47aa62c416c38a6b56",
+    "added_regression_tests": 30,
+    "validation_environment": [
+      "python",
+      "torch",
+      "torchvision",
+      "onnx",
+      "onnxruntime",
+      "numpy"
+    ],
+    "existing_packages_checked": 1487,
+    "unchanged_manifest_fingerprints": 1340,
+    "subgraph_manifest_models": 7,
+    "fingerprint_migrations": [
+      {
+        "source": "timm",
+        "name": "hieradet_small",
+        "old": "27bf3eecd1fc7191263e0553596ff071b215cf74e012d534a32c99980b8450fd",
+        "new": "705665e2821606f9c88753ee5d82664755711a0268de0053d090e887a11583e5",
+        "previous_rule_matches_manifest": true
+      },
+      {
+        "source": "timm",
+        "name": "vit_small_plus_patch16_dinov3_qkvb",
+        "old": "d8d887879ceb4fa7b4ebb3771a5e0f5bedb02b4b5d1b84bf45ef49461733d284",
+        "new": "5ba9fbd3809b6f2eb459a9253b5581ed2792e6a1de2fc3988ea474aca093da26",
+        "previous_rule_matches_manifest": true
+      },
+      {
+        "source": "timm",
+        "name": "sam2_hiera_small",
+        "old": "a2377c9f8833370f23a30db028abb9d3b8d9e5056827f0c63c652f7e8dea9f1c",
+        "new": "4d0e61289dc65fe6f5aa1b30920e1f375db9e54d80f88005a147422191b18628",
+        "previous_rule_matches_manifest": true
+      },
+      {
+        "source": "timm",
+        "name": "sam2_hiera_tiny",
+        "old": "5e60291e2ab0c81416bc1473cb04215de307c93de415bc5db4ebf72642ea38fa",
+        "new": "1d939b58f2449322c1bce07ec20c301500838ad89767fb8b99181282bf3733ea",
+        "previous_rule_matches_manifest": true
+      },
+      {
+        "source": "timm",
+        "name": "vit_small_patch16_dinov3_qkvb",
+        "old": "97fb46c41cf22d107a12604b6088d0373b14393d49aa19d3013b03c828e0553d",
+        "new": "977058ecc4e7a6716d2a3e74bf09fb0c3cf33e2eb802aa4136c880c3572dd043",
+        "previous_rule_matches_manifest": true
+      },
+      {
+        "source": "timm",
+        "name": "vit_small_plus_patch16_dinov3",
+        "old": "4dec067bc94886075a70ad9bcca562bc40e4f8052711b4bd99166e6998aefd50",
+        "new": "598fc650c7b5cbef4b571241db27bcaa02e89bc695dc286855c48483bc4e52ec",
+        "previous_rule_matches_manifest": true
+      },
+      {
+        "source": "timm",
+        "name": "vit_small_patch16_dinov3",
+        "old": "718cb464dcad86f0d4b44a2dc6e0953a126008d07e09a43361aad99ae6cbc07c",
+        "new": "fcc1350a3bd38a953bda0bb35dae4669b8e1016ffcddd3d5a025e1b4dfe18ea6",
+        "previous_rule_matches_manifest": true
+      }
+    ],
+    "unique_after_rehash": 1347,
+    "duplicates_after_rehash": 140,
+    "accepted_task_corrections": [
+      {
+        "name": "edanet_cityscapes",
+        "old": "classification",
+        "new": "segmentation",
+        "in_manifest": true
+      },
+      {
+        "name": "linknet_cityscapes",
+        "old": "classification",
+        "new": "segmentation",
+        "in_manifest": true
+      },
+      {
+        "name": "erfnet_cityscapes",
+        "old": "classification",
+        "new": "segmentation",
+        "in_manifest": true
+      },
+      {
+        "name": "esnet_cityscapes",
+        "old": "classification",
+        "new": "segmentation",
+        "in_manifest": true
+      },
+      {
+        "name": "sqnet_cityscapes",
+        "old": "classification",
+        "new": "segmentation",
+        "in_manifest": true
+      },
+      {
+        "name": "unet_cityscapes",
+        "old": "classification",
+        "new": "segmentation",
+        "in_manifest": true
+      }
+    ],
+    "fresh_affected_model_validation": {
+      "schema_version": 1,
+      "real_candidates": 13,
+      "validated_unique": 13,
+      "duplicates": 0,
+      "excluded": 0,
+      "by_source": {
+        "pytorchcv": 6,
+        "timm": 7
+      },
+      "by_task": {
+        "segmentation": 6,
+        "classification": 7
+      },
+      "complete": true,
+      "attempted": 13,
+      "required": 13,
+      "failed": 0,
+      "elapsed_s": 182.74,
+      "minimum_real_models": 13,
+      "exit_code": 0,
+      "fresh_exports": 13
+    },
+    "full_1347_reexport_after_fixes": false,
+    "scope": "Existing package hashes and architecture fingerprints checked for all 1487 previously valid candidates; all 13 affected configurations freshly exported and compared; three-source smoke and 146 tests passed. No device execution.",
+    "reviewed_subset_manifest_payload_sha256": "184e29852d54cad3cf7eff90e50e9d1be0a21d9f05e0c379b8d14bc2e7777912",
+    "current_general_manifest_payload_sha256": "f95d91d166b4695cf2b01f84302dec8e21fcd59eca07a9333a3522f055fdbbb8",
+    "pr2_integration": {
+      "previous_head": "cd4e03d3b00cff8f4dd935f26b3fd564f8946d33",
+      "additional_packages_checked": 75,
+      "additional_fingerprint_migrations": [
+        {
+          "source": "torchvision_tasks",
+          "name": "fasterrcnn_mobilenet_v3_large_320_fpn",
+          "old": "d59da17eea63451f70ca578221f998d0ba23ea37dd248ebb658a61e7ca1f9e3a",
+          "new": "689e723e48890ff04bdc42e5400dd550028b19b5817b8b3526c001e56c1c5abc",
+          "changed": true,
+          "has_subgraphs": true
+        },
+        {
+          "source": "torchvision_tasks",
+          "name": "fasterrcnn_resnet50_fpn",
+          "old": "939821300729030620eee078ab62b15a51df84d4bf7d91cc1f0fc7287fe0b9d0",
+          "new": "105edf7943f338ebf346ff4e420981965cb6680671943a1121c6178bfd7949c9",
+          "changed": true,
+          "has_subgraphs": true
+        },
+        {
+          "source": "torchvision_tasks",
+          "name": "retinanet_resnet50_fpn",
+          "old": "ea72f865002783580dff4f0a70c5069210f0559b21fda44342e7b23308a8c7e7",
+          "new": "e85474ff32a647a70a3f384e51defd98a4e48e4131206ce779f4801575683c20",
+          "changed": true,
+          "has_subgraphs": true
+        },
+        {
+          "source": "torchvision_tasks",
+          "name": "fcos_resnet50_fpn",
+          "old": "4a3ad1f50df105c4f0c2712c0ed9e97e84b1fca7ef95781af44ffa455866e0e3",
+          "new": "73bf625bed3b4b00277f903a4cffaaba473341e08157d44e722a6512659f0203",
+          "changed": true,
+          "has_subgraphs": true
+        },
+        {
+          "source": "paddleocr",
+          "name": "slanet",
+          "old": "30258e44373674ef8a07d1366dd42db8fa1d140fd9b0f0dc45b3f24dfbe38f57",
+          "new": "cd4eac49d1e464fb8a6daf85298cd4eca65a05ceb850896ba0d758bcc24ea646",
+          "changed": true,
+          "has_subgraphs": true
+        },
+        {
+          "source": "paddleocr",
+          "name": "table_attention_mobilenet_v3",
+          "old": "c2c3f4a3aec508d73989b191dc37fef29bc413061c16f0e64c0bd8d0c3c1d038",
+          "new": "ffec20a37bfac04d84d0a5c4fbeba81bc2c717dc893351e7e910f496d6154a77",
+          "changed": true,
+          "has_subgraphs": true
+        }
+      ],
+      "unit_and_operator_tests": 170,
+      "local_exit_code": 0,
+      "server_exit_code": 0,
+      "general_manifest_models": 1409,
+      "general_and_paddle_unique": 1422,
+      "general_by_task": {
+        "classification": 1076,
+        "segmentation": 266,
+        "detection": 9,
+        "pose_estimation": 1,
+        "super_resolution": 27,
+        "audio_separation": 1,
+        "speech_recognition": 2,
+        "language_modeling": 5,
+        "question_answering": 4,
+        "text_classification": 4,
+        "token_classification": 4,
+        "video_classification": 5,
+        "optical_flow": 2,
+        "text_generation": 1,
+        "depth_estimation": 1,
+        "time_series_forecasting": 1
+      },
+      "current_general_manifest_payload_sha256": "f95d91d166b4695cf2b01f84302dec8e21fcd59eca07a9333a3522f055fdbbb8",
+      "current_diverse_manifest_payload_sha256": "83e6b3a7e2b9419b84f1e235b17dc0300b9038299a0a6f173e21a1b092d01942",
+      "current_paddle_manifest_payload_sha256": "b2184dcb2e805fe375d4b33bc0fbe31385729319e61ee4571b3dcde8c7b1cc68",
+      "output_metadata_migrations": [
+        {
+          "source": "torchvision_tasks",
+          "name": "fasterrcnn_mobilenet_v3_large_320_fpn",
+          "old_scoped_fingerprint": "689e723e48890ff04bdc42e5400dd550028b19b5817b8b3526c001e56c1c5abc",
+          "new": "abc44e92694814b8e0592d92490ca91254d0d0f979fd94c7b153605732073745",
+          "same_inputs": true,
+          "torch_reference": "passed",
+          "reason": "Fresh signed export uses concrete output sizes; cached baseline retained symbolic output descriptions. Computational graph canonical diff is otherwise identical.",
+          "outputs": {
+            "boxes": {
+              "shape": [
+                0,
+                4
+              ],
+              "dtype": "float32",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "labels": {
+              "shape": [
+                0
+              ],
+              "dtype": "int64",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "scores": {
+              "shape": [
+                0
+              ],
+              "dtype": "float32",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        },
+        {
+          "source": "torchvision_tasks",
+          "name": "fasterrcnn_resnet50_fpn",
+          "old_scoped_fingerprint": "105edf7943f338ebf346ff4e420981965cb6680671943a1121c6178bfd7949c9",
+          "new": "696e58fa9026e7fc4e95136891e0c400c14c7e0de6680c28f8e340e55d16d7ca",
+          "same_inputs": true,
+          "torch_reference": "passed",
+          "reason": "Fresh signed export uses concrete output sizes; cached baseline retained symbolic output descriptions. Computational graph canonical diff is otherwise identical.",
+          "outputs": {
+            "boxes": {
+              "shape": [
+                100,
+                4
+              ],
+              "dtype": "float32",
+              "sha256": "2d776897829b63d120232b81a773e012db70e29cb26c465ab50ef382f4792e0d"
+            },
+            "labels": {
+              "shape": [
+                100
+              ],
+              "dtype": "int64",
+              "sha256": "9bc463f5782714d9d67fa58b37bd2be5c0ab6cbc457cb38efca8cf29d29b747d"
+            },
+            "scores": {
+              "shape": [
+                100
+              ],
+              "dtype": "float32",
+              "sha256": "c11e8fdf04ac0f626c4a46cf4c4fe48bd42dd520d4b0fe2f06ae08f978659592"
+            }
+          }
+        },
+        {
+          "source": "torchvision_tasks",
+          "name": "fcos_resnet50_fpn",
+          "old_scoped_fingerprint": "73bf625bed3b4b00277f903a4cffaaba473341e08157d44e722a6512659f0203",
+          "new": "49f99892c37627f20ec8b035db1fdd2597b9d24886867d58bd949e7b14ef58da",
+          "same_inputs": true,
+          "torch_reference": "passed",
+          "reason": "Fresh signed export uses concrete output sizes; cached baseline retained symbolic output descriptions. Computational graph canonical diff is otherwise identical.",
+          "outputs": {
+            "boxes": {
+              "shape": [
+                0,
+                4
+              ],
+              "dtype": "float32",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "labels": {
+              "shape": [
+                0
+              ],
+              "dtype": "int64",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "scores": {
+              "shape": [
+                0
+              ],
+              "dtype": "float32",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        },
+        {
+          "source": "torchvision_tasks",
+          "name": "retinanet_resnet50_fpn",
+          "old_scoped_fingerprint": "e85474ff32a647a70a3f384e51defd98a4e48e4131206ce779f4801575683c20",
+          "new": "0c434fb89b88b09d7f72590d106d5c434090f9a5ff8ced2776b7d4a920933bea",
+          "same_inputs": true,
+          "torch_reference": "passed",
+          "reason": "Fresh signed export uses concrete output sizes; cached baseline retained symbolic output descriptions. Computational graph canonical diff is otherwise identical.",
+          "outputs": {
+            "boxes": {
+              "shape": [
+                0,
+                4
+              ],
+              "dtype": "float32",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "labels": {
+              "shape": [
+                0
+              ],
+              "dtype": "int64",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "scores": {
+              "shape": [
+                0
+              ],
+              "dtype": "float32",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      ],
+      "source_and_tests_normalized_sha256": "936de4df48178361a46e8135cfdc6e8a91ff7009d98a7ab347d0d9ae0e76ece5",
+      "original_smoke": {
+        "schema_version": 1,
+        "real_candidates": 3,
+        "validated_unique": 3,
+        "duplicates": 0,
+        "excluded": 0,
+        "by_source": {
+          "pytorchcv": 1,
+          "segmentation_models": 1,
+          "timm": 1
+        },
+        "by_task": {
+          "classification": 2,
+          "segmentation": 1
+        },
+        "missing_tasks": [],
+        "complete": true,
+        "attempted": 3,
+        "required": 3,
+        "failed": 0,
+        "elapsed_s": 5.43,
+        "minimum_real_models": 3,
+        "exit_code": 0
+      },
+      "diverse_smoke": {
+        "schema_version": 1,
+        "real_candidates": 10,
+        "validated_unique": 10,
+        "duplicates": 0,
+        "excluded": 0,
+        "by_source": {
+          "torchaudio": 1,
+          "torchsr": 1,
+          "torchvision": 6,
+          "transformers": 2
+        },
+        "by_task": {
+          "audio_separation": 1,
+          "super_resolution": 1,
+          "detection": 4,
+          "video_classification": 1,
+          "optical_flow": 1,
+          "question_answering": 1,
+          "time_series_forecasting": 1
+        },
+        "missing_tasks": [],
+        "complete": true,
+        "attempted": 10,
+        "required": 10,
+        "failed": 0,
+        "elapsed_s": 15.43,
+        "minimum_real_models": 10,
+        "exit_code": 0
+      },
+      "paddle_smoke": {
+        "schema_version": 1,
+        "real_candidates": 5,
+        "validated_unique": 5,
+        "duplicates": 0,
+        "excluded": 0,
+        "by_source": {
+          "paddleocr": 4,
+          "paddleseg": 1
+        },
+        "by_task": {
+          "text_recognition": 1,
+          "text_detection": 1,
+          "table_structure_recognition": 2,
+          "image_matting": 1
+        },
+        "missing_tasks": [],
+        "complete": true,
+        "attempted": 5,
+        "required": 5,
+        "failed": 0,
+        "elapsed_s": 24.23,
+        "minimum_real_models": 5,
+        "exit_code": 0
+      },
+      "scope": "Current PR #2 integrated tests and source smoke; all affected new control-flow models re-exported and compared. No full 1409/1422 fresh replay or device execution."
+    },
+    "standalone_review_source_and_tests_normalized_sha256": "24b1a07e0ec94f706ba2828e243ef45060d62396bab9e6660d8826c75c7d3455"
+  },
+  "scope": "Original 1347-network subset with reviewed task labels; strict_replay records c7430c4. See task-expansion-results.json and paddle-models-results.json for the current combined corpus.",
+  "initial_manifest_revision": "c7430c4c0bb50540ebd19b47aa62c416c38a6b56"
 }

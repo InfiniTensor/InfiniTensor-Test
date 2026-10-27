@@ -18,27 +18,27 @@
   },
   "combined_validated_unique": 1422,
   "combined_by_task": {
-    "text_recognition": 3,
-    "text_detection": 2,
-    "table_structure_recognition": 2,
-    "text_orientation": 1,
-    "segmentation": 262,
-    "image_matting": 3,
-    "classification": 1082,
+    "classification": 1076,
+    "segmentation": 268,
     "detection": 9,
     "pose_estimation": 1,
+    "super_resolution": 27,
     "audio_separation": 1,
     "speech_recognition": 2,
-    "super_resolution": 27,
-    "video_classification": 5,
-    "optical_flow": 2,
     "language_modeling": 5,
     "question_answering": 4,
     "text_classification": 4,
     "token_classification": 4,
-    "depth_estimation": 1,
+    "video_classification": 5,
+    "optical_flow": 2,
     "text_generation": 1,
-    "time_series_forecasting": 1
+    "depth_estimation": 1,
+    "time_series_forecasting": 1,
+    "text_recognition": 3,
+    "text_detection": 2,
+    "table_structure_recognition": 2,
+    "text_orientation": 1,
+    "image_matting": 3
   },
   "libraries": {
     "paddlepaddle": "3.0.0",
@@ -206,5 +206,58 @@
   "packaging_and_constraints_normalized_sha256": {
     "pyproject.toml": "00723d0c5c3828670236c11acf870cc312773dc1727a92a29a8f4515c00f733b",
     "configs\\constraints-paddle.txt": "5abfeca094cfbd974c2f0b0ca55aae29eb848012ee1b8a3764de9cbc48fb4d62"
+  },
+  "review_followup": {
+    "previous_manifest_hashes": {
+      "general_manifest_payload_sha256": "ce0fccb1a04dec0d961aeabebc8eda8d8941d2393e1c5fbd1668bb732bb110e1",
+      "paddle_manifest_payload_sha256": "ae22a6918d15332100e085bcfe157675ac9818729c890eb36cfa76f14d44475e"
+    },
+    "changed_fingerprints": [
+      {
+        "source": "paddleocr",
+        "name": "slanet",
+        "old": "30258e44373674ef8a07d1366dd42db8fa1d140fd9b0f0dc45b3f24dfbe38f57",
+        "new": "cd4eac49d1e464fb8a6daf85298cd4eca65a05ceb850896ba0d758bcc24ea646",
+        "changed": true,
+        "has_subgraphs": true
+      },
+      {
+        "source": "paddleocr",
+        "name": "table_attention_mobilenet_v3",
+        "old": "c2c3f4a3aec508d73989b191dc37fef29bc413061c16f0e64c0bd8d0c3c1d038",
+        "new": "ffec20a37bfac04d84d0a5c4fbeba81bc2c717dc893351e7e910f496d6154a77",
+        "changed": true,
+        "has_subgraphs": true
+      }
+    ],
+    "current_general_manifest_payload_sha256": "f95d91d166b4695cf2b01f84302dec8e21fcd59eca07a9333a3522f055fdbbb8",
+    "scope": "Metadata/fingerprint migration only; original full replay evidence below retains its original source and manifest.",
+    "current_paddle_manifest_payload_sha256": "b2184dcb2e805fe375d4b33bc0fbe31385729319e61ee4571b3dcde8c7b1cc68",
+    "source_and_tests_normalized_sha256": "936de4df48178361a46e8135cfdc6e8a91ff7009d98a7ab347d0d9ae0e76ece5",
+    "smoke": {
+      "schema_version": 1,
+      "real_candidates": 5,
+      "validated_unique": 5,
+      "duplicates": 0,
+      "excluded": 0,
+      "by_source": {
+        "paddleocr": 4,
+        "paddleseg": 1
+      },
+      "by_task": {
+        "text_recognition": 1,
+        "text_detection": 1,
+        "table_structure_recognition": 2,
+        "image_matting": 1
+      },
+      "missing_tasks": [],
+      "complete": true,
+      "attempted": 5,
+      "required": 5,
+      "failed": 0,
+      "elapsed_s": 24.23,
+      "minimum_real_models": 5,
+      "exit_code": 0
+    }
   }
 }
