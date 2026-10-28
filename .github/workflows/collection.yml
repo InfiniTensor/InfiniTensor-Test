@@ -12,7 +12,8 @@ permissions:
 jobs:
   collection:
     name: Base installation / Python ${{ matrix.python }}
-    runs-on: ubuntu-latest
+    # Newer runner images no longer provide the Python 3.9 compatibility target.
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         python: ['3.9', '3.12']
