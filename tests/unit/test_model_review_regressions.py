@@ -146,7 +146,9 @@ def test_model_package_uses_the_same_validation_environment(tmp_path, monkeypatc
     environment = {"numpy": "old"}
     monkeypatch.setattr(collector, "validation_environment", lambda: dict(environment))
     def collect():
-        spec = ModelSpec("package", ModelSource.TIMM, ModelCategory.CLASSIFICATION,
+        # This factory returns ONNX directly; declaring a torch source would
+        # require an optional dependency unrelated to the cache assertion.
+        spec = ModelSpec("package", ModelSource.LOCAL, ModelCategory.CLASSIFICATION,
                          factory=factory, input_shape=[2])
         assert collector._materialize_one(spec, tmp_path / "cache", 1024 * 1024)
         return spec
