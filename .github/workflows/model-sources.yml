@@ -90,10 +90,16 @@ jobs:
         run: |
           # onnxoptimizer 0.3.13 has no cp312 wheel and vendors CMake 3.1 policies.
           python -m pip install cmake==3.31.10
+          # PEP 517 isolation hides the cmake Python module from its wrapper.
+          export PATH="$(python -c 'import cmake; print(cmake.CMAKE_BIN_DIR)'):$PATH"
+          cmake --version
           if ! python -m pip install -e '.[paddle,test]' -c configs/constraints-paddle.txt 2>&1 | tee paddle-install.log; then
             python - <<'PY'
           from pathlib import Path
-          text = '\n'.join(Path('paddle-install.log').read_text().splitlines()[-30:])
+          lines = Path('paddle-install.log').read_text().splitlines()
+          starts = [i for i, line in enumerate(lines) if any(term in line for term in ('CMake Error', 'ModuleNotFoundError', 'Traceback'))]
+          detail = [line for i in starts[:4] for line in lines[max(0, i-2):i+16]]
+          text = '\n'.join(detail + lines[-30:])
           text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
           print('::error title=Paddle dependency installation failed::' + text)
           PY
