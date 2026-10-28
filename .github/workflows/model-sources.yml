@@ -86,6 +86,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install independent CPU Paddle environment
+        shell: bash
         run: |
           if ! python -m pip install -e '.[paddle,test]' -c configs/constraints-paddle.txt 2>&1 | tee paddle-install.log; then
             python - <<'PY'
