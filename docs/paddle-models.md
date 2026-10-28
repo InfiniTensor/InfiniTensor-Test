@@ -37,6 +37,7 @@ Paddle2ONNX 的静态转换可能修改 Layer 内部状态。参考输出在转�
 ```bash
 python3.12 -m venv .venv-paddle
 source .venv-paddle/bin/activate
+python -m pip install cmake==3.31.10
 python -m pip install -e '.[paddle,test]' -c configs/constraints-paddle.txt
 python -m pip check
 
