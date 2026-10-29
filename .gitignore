@@ -18,6 +18,7 @@ htmlcov/
 venv/
 env/
 .venv/
+.venv-networks/
 
 # IDE
 .idea/
@@ -31,6 +32,10 @@ data/models/
 data/cache/
 data/results/
 data/reports/
+data/real-networks/
+data/paddle-repos/
+data/paddle-networks/
+.venv-paddle/
 *.log
 
 # Model files (NEVER commit)

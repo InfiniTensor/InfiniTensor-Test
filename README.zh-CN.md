@@ -1,5 +1,10 @@
 # InfiniTensor-Test
 
+[通用清单](catalogs/real-networks.json)与[飞桨清单](catalogs/paddle-networks.json)合计
+**1422 个去重网络配置、21 种任务**（1409 + 13），新增 OCR、表格结构、图像抠图等任务，
+全部通过 ONNX 检查、参考执行及原始框架/ONNX 全部输出比较。原有 548 个合成正例与 18 个负例另计。
+安装与复验见[多任务网络说明](docs/task-expansion.md)和[飞桨模型接入说明](docs/paddle-models.md)。
+
 本分支合并采集基础与模型有效性修复：来源按需加载、确定性完整包缓存，
 以及 548 个合成正例的 ONNX 检查和 CPU 参考执行、18 个明确负例的按原因拒绝验证。
 请先阅读[能力提升及复验命令](docs/pr-t01-collection.md)与[PR 审查说明](docs/pr-t01-review.md)。

@@ -1,5 +1,12 @@
 # InfiniTensor-Test
 
+The [general corpus](catalogs/real-networks.json) and [Paddle corpus](catalogs/paddle-networks.json)
+contain **1,422 deduplicated network configurations across 21 tasks** (1,409 + 13),
+including OCR, table structure, image matting, text, audio, video and optical flow,
+validated with ONNX checks, ONNX Runtime and all-output PyTorch/ONNX comparison.
+The 548 synthetic positives and 18 negatives are counted separately. See
+[multi-task sources](docs/task-expansion.md) and [Paddle sources and replay commands](docs/paddle-models.md).
+
 This change combines lazy sources, reproducible package collection and model
 validity repairs: 548 synthetic positives must pass ONNX checks and CPU reference
 execution; 18 declared negatives must be rejected for their specified reasons.

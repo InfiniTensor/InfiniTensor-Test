@@ -13,18 +13,37 @@ _MODULES = {
                  "reduction", "slice", "template", "norm")
 }
 _MODULES.update(torchvision="torchvision_source", timm="timm_source",
+                pytorchcv="pytorchcv_source", segmentation_models="segmentation_source",
                 timm_small="timm_source", huggingface="huggingface_source",
                 onnx_zoo="onnx_zoo_source")
+_MODULES.update(torchvision_tasks="vision_tasks_source", torchsr="torchsr_source",
+                torchaudio="audio_source", transformers="transformers_source")
+_MODULES.update({name: "paddle_source" for name in ("paddleocr", "paddleseg", "paddledetection")})
 _DEPENDENCIES = {
+    "pytorchcv": ("pytorchcv", "pytorchcv"),
+    "segmentation_models": ("segmentation_models_pytorch", "segmentation"),
     "torchvision": ("torchvision", "torchvision"),
     "timm": ("timm", "timm"),
     "timm_small": ("timm", "timm"),
     "huggingface": ("huggingface_hub", "huggingface"),
+    "torchvision_tasks": ("torchvision", "torchvision"),
+    "torchsr": ("torchsr", "super-resolution"),
+    "torchaudio": ("torchaudio", "audio"),
+    "transformers": ("transformers", "text"),
+    "paddleocr": ("paddle", "paddle"),
+    "paddleseg": ("paddle", "paddle"),
+    "paddledetection": ("paddle", "paddle"),
 }
 
 
 class OptionalDependencyError(RuntimeError):
     """A selected source cannot initialize its optional dependencies."""
+
+
+class SourceSizeLimitError(ValueError):
+    def __init__(self, size_bytes):
+        self.size_bytes = size_bytes
+        super().__init__(f"network parameters require {size_bytes} bytes")
 
 
 def register_source(source_id):

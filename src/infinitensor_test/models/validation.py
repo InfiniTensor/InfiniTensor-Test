@@ -5,7 +5,9 @@ Non-floating or dynamic inputs require an explicit metadata['input_file'] NPZ.
 """
 
 import hashlib
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+import platform
 
 import numpy as np
 import onnx
@@ -13,6 +15,19 @@ from onnx import helper, numpy_helper
 import onnxruntime as ort
 
 from infinitensor_test.artifacts import digest, stable_seed
+
+
+def validation_environment():
+    """One dependency signature for task recovery and model-package validation."""
+    versions = {"python": platform.python_version(), "numpy": np.__version__,
+                "onnx": onnx.__version__, "onnxruntime": ort.__version__}
+    # Query optional dependencies without importing them in a base installation.
+    for package in ("torch", "torchvision"):
+        try:
+            versions[package] = version(package)
+        except PackageNotFoundError:
+            versions[package] = None
+    return versions
 
 
 class ModelValidationError(ValueError):

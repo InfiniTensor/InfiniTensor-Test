@@ -5,7 +5,7 @@ replace the last valid package. No exporter cleans a shared model directory.
 Every positive package must pass ONNX checks and CPU reference execution.
 """
 
-from contextlib import contextmanager, redirect_stdout
+from contextlib import contextmanager, nullcontext, redirect_stdout
 import io
 import json
 from pathlib import Path
@@ -22,9 +22,11 @@ import onnxruntime as ort
 
 from infinitensor_test.artifacts import atomic_json, copy_package, digest, model_manifest, stable_seed
 from infinitensor_test.models.catalog import ModelCatalog
-from infinitensor_test.models.registry import OptionalDependencyError
+from infinitensor_test.models.registry import OptionalDependencyError, SourceSizeLimitError
 from infinitensor_test.models.validation import (ModelValidationError, input_file_digest,
-                                                 validate_reference)
+                                                 validate_reference, validation_environment)
+from infinitensor_test.models.torch_validation import flatten_torch_outputs, validate_torch_export
+from infinitensor_test.models.torch_inputs import contract_arrays, materialize_contract
 
 
 # Bump when export/validation policy changes. Unversioned legacy caches are
@@ -39,8 +41,18 @@ def factory_seed(spec, seed):
     np.random.seed(value)
     random.seed(value)
     try:
+        if spec.metadata.get("export_backend") == "paddle":
+            import paddle
+            paddle.set_device("cpu")
+            state = paddle.get_rng_state("cpu")
+            paddle.seed(value)
+            try:
+                yield
+            finally:
+                paddle.set_rng_state(state)
+            return
         torch = sys.modules.get("torch")
-        if spec.source.value in ("torchvision", "timm") and torch is None:
+        if (spec.source.value in ("torchvision", "timm") or spec.metadata.get("export_backend") == "torch") and torch is None:
             import torch
         if torch is not None:
             with torch.random.fork_rng(devices=[]):
@@ -59,18 +71,40 @@ def validate_model(path, spec=None, seed=42):
     return manifest, validate_reference(path, spec, seed)
 
 
-def _export_torch_to_onnx(model, dst, input_shape):
+def _export_torch_to_onnx(model, dst, input_shape, spec=None, seed=42):
     try:
         import torch
     except ImportError as error:
         raise OptionalDependencyError(
             "Exporting a torch model requires infinitensor-test[torchvision]."
         ) from error
-    if not input_shape or any(not isinstance(d, int) or d <= 0 for d in input_shape):
-        raise ValueError("torch export requires a concrete, positive input_shape")
+    if spec is not None and "torch_input_contract" in spec.metadata:
+        values = contract_arrays(spec, seed)
+        inputs, names = tuple(torch.from_numpy(v) for v in values.values()), list(values)
+    else:
+        if not input_shape or any(not isinstance(d, int) or d <= 0 for d in input_shape):
+            raise ValueError("torch export requires a concrete, positive input_shape")
+        inputs, names = (torch.zeros(*input_shape),), ["x"]
     model.eval()
-    torch.onnx.export(model, torch.zeros(*input_shape), str(dst), opset_version=18,
-                      dynamo=False, verbose=False, input_names=["x"], output_names=["y"])
+    torch.onnx.export(model, inputs, str(dst), opset_version=18,
+                      dynamo=False, verbose=False, input_names=names,
+                      output_names=spec.metadata.get("torch_output_names", ["y"]) if spec else ["y"])
+    if spec is not None and "torch_input_contract" in spec.metadata:
+        # These are explicitly static invocations. Replace exporter-generated
+        # symbolic output aliases with actual PyTorch shapes, never guessed shapes.
+        with torch.inference_mode():
+            outputs = flatten_torch_outputs(model(*inputs))
+        graph = onnx.load(str(dst), load_external_data=False)
+        if len(graph.graph.output) != len(outputs):
+            raise ValueError("exporter output count differs from torch invocation")
+        for info, value in zip(graph.graph.output, outputs):
+            if np.dtype(onnx.helper.tensor_dtype_to_np_dtype(info.type.tensor_type.elem_type)) != value.dtype:
+                raise ValueError("exporter output dtype differs from torch invocation")
+            shape = info.type.tensor_type.shape
+            shape.ClearField("dim")
+            for size in value.shape:
+                shape.dim.add().dim_value = size
+        onnx.save(graph, str(dst))
     return dst.exists()
 
 
@@ -99,6 +133,9 @@ def _record(spec, target, manifest, validation, cached):
     spec.size_hint_bytes = manifest["size_bytes"]
     spec.metadata.update(model_sha256=manifest["sha256"], validation=validation,
                          cache_hit=cached, collector_version=GENERATOR_VERSION)
+    inputs = validation.get("inputs", {})
+    if spec.input_shape is None and len(inputs) == 1:
+        spec.input_shape = list(next(iter(inputs.values()))["shape"])
 
 
 @contextmanager
@@ -128,6 +165,7 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
         spec.metadata.pop(key, None)
     spec.skip_reason = None
     try:
+        materialize_contract(spec, root, seed)
         origin = None
         if spec.factory is None and spec.path:
             origin_path = Path(spec.metadata.get("origin_path", spec.path)).absolute()
@@ -137,16 +175,25 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
             elif spec.path.is_file():
                 origin = _origin_digest(spec.path)
         cache_key = digest({
-            "collector_version": GENERATOR_VERSION, "onnx_version": onnx.__version__,
-            "onnxruntime_version": ort.__version__, "input_file_sha256": input_file_digest(spec),
+            "collector_version": GENERATOR_VERSION,
+            "validation_environment": validation_environment(), "input_file_sha256": input_file_digest(spec),
             "expected_rejection": spec.expected_rejection, "rejection_reason": spec.rejection_reason,
-            "numpy_version": np.__version__, "seed": seed,
+            "seed": seed,
             "source": spec.source.value, "name": spec.name,
             "input_shape": spec.input_shape, "num_classes": spec.num_classes,
             "generator_version": spec.metadata.get("generator_version", 0),
             "definition_sha256": spec.metadata.get("definition_sha256"),
+            **({"torch_input_contract": spec.metadata["torch_input_contract"],
+                "torch_output_names": spec.metadata.get("torch_output_names")}
+               if "torch_input_contract" in spec.metadata else {}),
             "source_params": spec.metadata.get("source_params", {}), "origin": origin,
-            "source_library_version": getattr(sys.modules.get(spec.source.value), "__version__", None),
+            "source_library_version": spec.metadata.get("source_library_version") or
+                getattr(sys.modules.get(spec.source.value), "__version__", None),
+            **({"input_contract": spec.metadata.get("input_contract"),
+                "upstream_revision": spec.metadata.get("upstream_revision"),
+                "paddle_version": spec.metadata.get("paddle_version"),
+                "paddle2onnx_version": spec.metadata.get("paddle2onnx_version")}
+               if spec.metadata.get("export_backend") == "paddle" else {}),
         })
         if not force and current.is_file():
             try:
@@ -160,7 +207,14 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
                     if not target.is_relative_to(package / "files"):
                         raise ValueError("cached main file escapes package")
                     manifest, validation = validate_model(target, spec, seed)
-                    if manifest == stamp["model"] and validation == stamp["validation"]:
+                    old_validation = dict(stamp["validation"])
+                    parities = {key: old_validation.pop(key, None) for key in ("torch_reference", "paddle_reference")}
+                    backend = spec.metadata.get("export_backend")
+                    parity = parities.get(f"{backend}_reference")
+                    if backend in ("torch", "paddle") and (not parity or parity.get("state") != "passed"):
+                        raise ValueError("real network cache has no source-framework/ONNX parity evidence")
+                    if manifest == stamp["model"] and validation == old_validation:
+                        validation.update({k: v for k, v in parities.items() if v})
                         if manifest["size_bytes"] > max_size_bytes:
                             spec.path = None
                             spec.size_hint_bytes = manifest["size_bytes"]
@@ -175,8 +229,12 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
         with _staging_package(root) as (stage, retain):
             (stage / "files").mkdir()
             dst = stage / "files/model.onnx"
+            torch_model = None
+            paddle_model = None
+            paddle_expected = None
             if spec.factory:
-                with factory_seed(spec, seed), redirect_stdout(io.StringIO()):
+                output = nullcontext() if spec.metadata.get("export_backend") == "paddle" else redirect_stdout(io.StringIO())
+                with factory_seed(spec, seed), output:
                     result = spec.factory()
                     if isinstance(result, onnx.ModelProto):
                         onnx.save(result, str(dst))
@@ -189,13 +247,43 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
                             raise ValueError(f"unknown factory kind: {result[0]!r}")
                     elif result is None:
                         raise ValueError("factory returned None")
+                    elif spec.metadata.get("export_backend") == "paddle":
+                        from .paddle_validation import export_paddle
+                        parameter_bytes = sum(int(np.prod(v.shape)) * np.dtype(str(v.dtype).split(".")[-1]).itemsize
+                                              for v in result.state_dict().values())
+                        spec.metadata["parameter_size_bytes"] = parameter_bytes
+                        if parameter_bytes > max_size_bytes:
+                            spec.path = None
+                            spec.skip_reason = "parameter_size_limit"
+                            return False
+                        paddle_expected = export_paddle(result, dst, spec, seed)
+                        paddle_model = result
                     else:
-                        _export_torch_to_onnx(result, dst, spec.input_shape)
+                        # Bound large source libraries before expensive ONNX export.
+                        parameter_bytes = sum(v.numel() * v.element_size() for v in result.state_dict().values())
+                        spec.metadata["parameter_size_bytes"] = parameter_bytes
+                        if parameter_bytes > max_size_bytes:
+                            spec.path = None
+                            spec.skip_reason = "parameter_size_limit"
+                            return False
+                        if spec.input_shape is None:
+                            size = getattr(result, "in_size", None)
+                            import torch
+                            first_conv = next((m for m in result.modules() if isinstance(m, torch.nn.Conv2d)), None)
+                            if size is not None and len(size) == 2 and first_conv is not None:
+                                spec.input_shape = [1, first_conv.in_channels, *size]
+                        _export_torch_to_onnx(result, dst, spec.input_shape, spec, seed)
+                        torch_model = result
             elif spec.path and spec.path.is_file():
                 dst = _copy_into_stage(spec.path, stage)
             else:
                 raise ValueError("no factory and no existing model path")
             manifest, validation = validate_model(dst, spec, seed)
+            if torch_model is not None and spec.metadata.get("model_kind") == "real_network":
+                validation["torch_reference"] = validate_torch_export(torch_model, dst, spec, seed)
+            if paddle_model is not None:
+                from .paddle_validation import validate_paddle_export
+                validation["paddle_reference"] = validate_paddle_export(paddle_model, dst, spec, seed, paddle_expected)
             spec.size_hint_bytes = manifest["size_bytes"]
             if manifest["size_bytes"] > max_size_bytes:
                 spec.path = None
@@ -216,11 +304,18 @@ def _materialize_one(spec, models_dir, max_size_bytes, force=False, seed=42):
             return True
     except OptionalDependencyError:
         raise
+    except SourceSizeLimitError as error:
+        spec.path = None
+        spec.metadata["parameter_size_bytes"] = error.size_bytes
+        spec.skip_reason = "parameter_size_limit"
+        return False
     except Exception as error:
         spec.path = None
         spec.metadata["collection_error"] = f"{type(error).__name__}: {error}"
         spec.metadata["collection_error_code"] = (
-            error.stage if isinstance(error, ModelValidationError) else "collection_failure")
+            error.stage if isinstance(error, ModelValidationError) else
+            "environment_blocked" if isinstance(error, ImportError) and spec.metadata.get("export_backend") == "paddle"
+            else "collection_failure")
         return False
 
 
@@ -238,7 +333,7 @@ def collect(catalog, settings, sources=None, force=False, progress=True, limit=N
               "positive_validated": 0, "negative_rejected": 0, "errors_by_stage": {}}
     start = time.monotonic()
     for index, spec in enumerate(selected):
-        if spec.is_skipped and spec.skip_reason != "size_limit":
+        if spec.is_skipped and spec.skip_reason not in ("size_limit", "parameter_size_limit"):
             counts["skipped"] += 1
             continue
         cap = settings.max_model_size_bytes

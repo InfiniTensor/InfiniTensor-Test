@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "description": "Complete official Paddle networks with Paddle/ONNX parity; random weights, no checkpoint downloads.",
+  "seed": 42,
+  "required_tasks": [
+    "image_matting",
+    "segmentation",
+    "table_structure_recognition",
+    "text_detection",
+    "text_orientation",
+    "text_recognition"
+  ],
+  "upstream_revisions": {
+    "paddleocr": {
+      "repository": "PaddleOCR",
+      "revision": "3f32858ce3fb95ba04a8202000e432bcc50a6016"
+    },
+    "paddleseg": {
+      "repository": "PaddleSeg",
+      "revision": "3c4db66de1d9d59d0628ed87590b6308a2f4aa2a"
+    }
+  },
+  "libraries": {
+    "paddlepaddle": "3.0.0",
+    "paddle2onnx": "2.0.1",
+    "onnxoptimizer": "0.3.13",
+    "numpy": "1.26.4",
+    "onnx": "1.17.0",
+    "onnxruntime": "1.20.1",
+    "protobuf": "4.25.3",
+    "setuptools": "78.1.0",
+    "opencv-python-headless": "4.11.0.86",
+    "scipy": "1.17.1",
+    "scikit-learn": "1.7.2",
+    "pymatting": "1.1.14",
+    "numba": "0.68.0",
+    "llvmlite": "0.50.0",
+    "visualdl": "2.5.3"
+  },
+  "models": [
+    {
+      "source": "paddleocr",
+      "name": "crnn_mobilenet_v3",
+      "task": "text_recognition",
+      "input_shape": [
+        1,
+        3,
+        32,
+        100
+      ],
+      "architecture_sha256": "df91950b4f2463b38e5e0fcb30e1547a6f5fb65465664ad690a4fd763e37b434",
+      "inputs_sha256": "49e6fa0c620d7a691350a3277eef2fad4a9da16552bee427b2ec1fd3490370ab",
+      "max_size_mb": 768,
+      "upstream_config": "configs/rec/rec_mv3_none_bilstm_ctc.yml"
+    },
+    {
+      "source": "paddleocr",
+      "name": "db_mobilenet_v3",
+      "task": "text_detection",
+      "input_shape": [
+        1,
+        3,
+        320,
+        320
+      ],
+      "architecture_sha256": "3e039b830a8dfd14407ee5146ad1f3ed549e1584287840ffdc42ba0594d85b5d",
+      "inputs_sha256": "ed0a2424aad955f0bd67114fd7067a9aa6ec9768cc9c8e417219a25b8554e6b4",
+      "max_size_mb": 768,
+      "upstream_config": "configs/det/det_mv3_db.yml"
+    },
+    {
+      "source": "paddleocr",
+      "name": "crnn_resnet34_vd",
+      "task": "text_recognition",
+      "input_shape": [
+        1,
+        3,
+        32,
+        100
+      ],
+      "architecture_sha256": "78bde78d9b575df6f1a5d750d7ac168536c6b92e9f66ab73d777e99307f61b0b",
+      "inputs_sha256": "c14086bbd7a162ce87bba70eeb7a2e0a7148e0cbcf139c9fa04a12d8de2a1cca",
+      "max_size_mb": 768,
+      "upstream_config": "configs/rec/rec_r34_vd_none_bilstm_ctc.yml"
+    },
+    {
+      "source": "paddleocr",
+      "name": "db_resnet50_vd",
+      "task": "text_detection",
+      "input_shape": [
+        1,
+        3,
+        320,
+        320
+      ],
+      "architecture_sha256": "790c2a29472c5a1a0a90ceea550512178b891a0a999a895153e2ae0037564063",
+      "inputs_sha256": "7e41d798aab6c6e66340a64ca87ea63e5330ec51662a3f25cce7686d7bec1cde",
+      "max_size_mb": 768,
+      "upstream_config": "configs/det/det_r50_vd_db.yml"
+    },
+    {
+      "source": "paddleocr",
+      "name": "svtr_tiny",
+      "task": "text_recognition",
+      "input_shape": [
+        1,
+        3,
+        64,
+        256
+      ],
+      "architecture_sha256": "0f3067fbe753121905c8358627fe806b62ac9d406bb7b4e1b53c564f1ae7cf85",
+      "inputs_sha256": "b4be2af670c06a13e6011039982df08ae35c32cc96c12c9d642dc4b98c9a8899",
+      "max_size_mb": 768,
+      "upstream_config": "configs/rec/rec_svtrnet.yml"
+    },
+    {
+      "source": "paddleocr",
+      "name": "slanet",
+      "task": "table_structure_recognition",
+      "input_shape": [
+        1,
+        3,
+        488,
+        488
+      ],
+      "architecture_sha256": "cd4eac49d1e464fb8a6daf85298cd4eca65a05ceb850896ba0d758bcc24ea646",
+      "inputs_sha256": "7cbcded46b9101af63fcb64b8d35cd358b221610bf0bd576e9497961f8c8b86a",
+      "max_size_mb": 768,
+      "upstream_config": "configs/table/SLANet.yml"
+    },
+    {
+      "source": "paddleocr",
+      "name": "text_orientation_mobilenet_v3",
+      "task": "text_orientation",
+      "input_shape": [
+        1,
+        3,
+        48,
+        192
+      ],
+      "architecture_sha256": "0f6cce046c22bcc6156314bfa485edd308fd37de8e1819a52b3e36a1f8d184b8",
+      "inputs_sha256": "d962786e0410c2f57c3e66c70b87ec87b91915e8326534f7883fcdcdad5d0005",
+      "max_size_mb": 768,
+      "upstream_config": "configs/cls/cls_mv3.yml"
+    },
+    {
+      "source": "paddleseg",
+      "name": "bisenet_v2",
+      "task": "segmentation",
+      "input_shape": [
+        1,
+        3,
+        256,
+        256
+      ],
+      "architecture_sha256": "c09c9b7b343588ac3d5a2197bf1654f0097534e631272cea18abdf8e2bfd8f89",
+      "inputs_sha256": "0df027077be16a9d7a457a1885a726b3f7c0c4861b19b2c9cf253ec37c79ca7b",
+      "max_size_mb": 768,
+      "upstream_config": "configs/bisenet/bisenet_cityscapes_1024x1024_160k.yml"
+    },
+    {
+      "source": "paddleocr",
+      "name": "table_attention_mobilenet_v3",
+      "task": "table_structure_recognition",
+      "input_shape": [
+        1,
+        3,
+        488,
+        488
+      ],
+      "architecture_sha256": "ffec20a37bfac04d84d0a5c4fbeba81bc2c717dc893351e7e910f496d6154a77",
+      "inputs_sha256": "43ff70e291fe37236718597f4cc3c83e628132c6b9d30bb14e488c8445f46f3b",
+      "max_size_mb": 768,
+      "upstream_config": "configs/table/table_mv3.yml"
+    },
+    {
+      "source": "paddleseg",
+      "name": "pp_liteseg_stdc1",
+      "task": "segmentation",
+      "input_shape": [
+        1,
+        3,
+        256,
+        512
+      ],
+      "architecture_sha256": "61601fbba47728821528584b89876e51017945400b6f0857eb4cf7096649a6a8",
+      "inputs_sha256": "533e56e36f3905b85f0e895b4e6d82e308cdc50bfe97eaec12cdff293b369657",
+      "max_size_mb": 768,
+      "upstream_config": "configs/pp_liteseg/pp_liteseg_stdc1_cityscapes_1024x512_scale0.5_160k.yml"
+    },
+    {
+      "source": "paddleseg",
+      "name": "modnet_mobilenet_v2",
+      "task": "image_matting",
+      "input_shape": [
+        1,
+        3,
+        512,
+        512
+      ],
+      "architecture_sha256": "74a7eede14495c606b1bf3399cd4bd580dce5021e5bd683347d80d45bafb091f",
+      "inputs_sha256": "aa3a117a3d34d475a7a55109425e967eddad1ba4b92926c9119e2665b8a334ea",
+      "max_size_mb": 768,
+      "upstream_config": "Matting/configs/modnet/modnet-mobilenetv2.yml"
+    },
+    {
+      "source": "paddleseg",
+      "name": "ppmatting_hrnet18",
+      "task": "image_matting",
+      "input_shape": [
+        1,
+        3,
+        512,
+        512
+      ],
+      "architecture_sha256": "4542596ed2cf6375ad4814f8a29ccab85e0685e22b7b06e805b948ff55f8e8c4",
+      "inputs_sha256": "34e78a5bd8ad9cd1a0072c03e23a5891cbb8841a1f5ba06c41c15fe2aa193931",
+      "max_size_mb": 768,
+      "upstream_config": "Matting/configs/ppmatting/ppmatting-hrnet_w18-human_512.yml"
+    },
+    {
+      "source": "paddleseg",
+      "name": "modnet_resnet50_vd",
+      "task": "image_matting",
+      "input_shape": [
+        1,
+        3,
+        512,
+        512
+      ],
+      "architecture_sha256": "c891b00ae0f103c5ff99fb034e858f669b2756b6e2d67ff35c250097b0654a50",
+      "inputs_sha256": "87c2732a2d73178a6a481d6c830b8bd436ebfd5e1f5f41d4dd53a4a086187e55",
+      "max_size_mb": 768,
+      "upstream_config": "Matting/configs/modnet/modnet-resnet50_vd.yml"
+    }
+  ]
+}

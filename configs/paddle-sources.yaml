@@ -1,0 +1,4 @@
+paddleocr: {}
+paddleseg: {}
+# Experimental: this checkout currently needs additional training/import dependencies.
+paddledetection: {}

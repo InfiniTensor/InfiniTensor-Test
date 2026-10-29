@@ -38,6 +38,25 @@ class ModelCategory(str, enum.Enum):
     ACTIVATION = "activation"           # activation functions
     SYNTHETIC = "synthetic"             # generic catch-all for synth
     OTHER = "other"
+    SUPER_RESOLUTION = "super_resolution"
+    OPTICAL_FLOW = "optical_flow"
+    VIDEO_CLASSIFICATION = "video_classification"
+    POSE_ESTIMATION = "pose_estimation"
+    INSTANCE_SEGMENTATION = "instance_segmentation"
+    SPEECH_RECOGNITION = "speech_recognition"
+    AUDIO_SEPARATION = "audio_separation"
+    TEXT_CLASSIFICATION = "text_classification"
+    TOKEN_CLASSIFICATION = "token_classification"
+    QUESTION_ANSWERING = "question_answering"
+    LANGUAGE_MODELING = "language_modeling"
+    TEXT_GENERATION = "text_generation"
+    TIME_SERIES_FORECASTING = "time_series_forecasting"
+    DEPTH_ESTIMATION = "depth_estimation"
+    TEXT_DETECTION = "text_detection"
+    TEXT_RECOGNITION = "text_recognition"
+    TEXT_ORIENTATION = "text_orientation"
+    TABLE_STRUCTURE_RECOGNITION = "table_structure_recognition"
+    IMAGE_MATTING = "image_matting"
 
 
 class ModelSource(str, enum.Enum):
@@ -45,10 +64,18 @@ class ModelSource(str, enum.Enum):
 
     TORCHVISION = "torchvision"
     TIMM = "timm"
+    PYTORCHCV = "pytorchcv"
+    SEGMENTATION_MODELS = "segmentation_models"
     HUGGINGFACE = "huggingface"
     ONNX_ZOO = "onnx_zoo"
     SYNTHETIC = "synthetic"
     LOCAL = "local"                     # pre-existing user file
+    TORCHSR = "torchsr"
+    TORCHAUDIO = "torchaudio"
+    TRANSFORMERS = "transformers"
+    PADDLEOCR = "paddleocr"
+    PADDLESEG = "paddleseg"
+    PADDLEDETECTION = "paddledetection"
 
 
 @dataclass

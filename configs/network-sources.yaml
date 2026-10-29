@@ -1,0 +1,6 @@
+# Optional source selection for exploratory collection.
+# Do not supply this file when replaying the full accepted manifest.
+pytorchcv: {}
+segmentation_models:
+  decoders: [Unet, UnetPlusPlus, MAnet, Linknet, FPN, PSPNet, PAN, DeepLabV3, DeepLabV3Plus, Segformer]
+timm: {}

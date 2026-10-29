@@ -20,6 +20,7 @@ from infinitensor_test.models.spec import (
     ModelSource,
 )
 from infinitensor_test.models.registry import register_source
+from .network_common import provenance
 
 
 def _safe_create(builder, name: str, **kwargs) -> nn.Module:
@@ -89,6 +90,7 @@ def _torchvision_specs() -> List[ModelSpec]:
             tags=["torchvision", "classification", "image"],
             size_hint_bytes=0,  # unknown until materialization
             num_classes=1000,
+            metadata=provenance("torchvision", "https://github.com/pytorch/vision", name, "classification"),
         )
         out.append(spec)
     return out
@@ -111,6 +113,8 @@ def _torchvision_detection_specs() -> List[ModelSpec]:
         input_shape=[1, 3, 320, 320],
         tags=["torchvision", "detection", "ssd"],
         num_classes=10,
+        metadata=provenance("torchvision", "https://github.com/pytorch/vision",
+                            "ssdlite320_mobilenet_v3_large", "detection"),
     ))
     return out
 
