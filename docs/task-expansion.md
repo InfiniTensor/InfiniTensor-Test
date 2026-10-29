@@ -90,3 +90,5 @@ python -m pytest tests/integration/test_diverse_sources.py -q
 筛选以完整 ONNX 图、确定输入、CPU 参考执行和 PyTorch/ONNX 数值一致性为准，不要求 InfiniTensor 目前已经实现所有算子。新网络覆盖 Conv/ConvTranspose、MatMul、归一化、Softmax、Gather/索引、Resize、GridSample、ROI/NMS 等计算需求，可用于发现并推动后端缺口。
 
 本轮没有构建或执行 InfiniTensor，也没有验证 A100 GPU 设备支持率。实际支持仍需要检查图中算子、dtype、形状和组合语义并运行设备比较。随机参数通过不代表模型任务精度；固定输入通过不代表所有动态形状或数据相关分支均已验证。
+
+现有 `runner/engine.py` 尚未接入这里保存的输入 NPZ，仍只写入第一个 FP32 输入、读取第一个输出，且参考失败时可能关闭比较后继续执行。因此本 PR 的 1422 项采集/导出通过数不能作为设备正确执行数，也不能用旧执行器的 `OK` 证明新增多输入、INT64 或多输出模型已验证正确。后续执行器修复应优先接入 NPZ、全部输入输出比较，并将参考失败作为明确失败处理。

@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 
+import onnx
 import yaml
 
 from infinitensor_test.artifacts import atomic_json, digest, model_manifest
@@ -18,7 +19,8 @@ from infinitensor_test.config import load_settings
 from infinitensor_test.models.catalog import ModelCatalog, _dict_to_spec
 from infinitensor_test.models.inventory import real_inventory
 from infinitensor_test.models.registry import get_source
-from infinitensor_test.models.validation import validation_environment
+from infinitensor_test.models.validation import (array_info, prepare_reference_inputs,
+                                                 validation_environment)
 
 
 def _run_batch(requests, root, timeout, resume):
@@ -35,12 +37,20 @@ def _run_batch(requests, root, timeout, resume):
             try:
                 candidate = json.loads(path.read_text(encoding="utf-8"))
                 if candidate.get("request_sha256") == request["request_sha256"]:
-                    if candidate["state"] != "valid":
+                    if candidate["state"] in ("failed", "excluded"):
                         previous = candidate
-                    else:
+                    elif candidate["state"] == "valid":
                         spec = _dict_to_spec(candidate["spec"])
                         if spec.path and model_manifest(spec.path)["sha256"] == spec.metadata.get("model_sha256"):
-                            previous = candidate
+                            # ONNX packages do not include the invocation NPZ.
+                            # Read/type-check all actual inputs and bind their
+                            # array identity to the saved reference evidence.
+                            model = onnx.load(str(spec.path), load_external_data=False)
+                            inputs, _ = prepare_reference_inputs(model, spec, request["seed"])
+                            if digest(array_info(inputs)) == spec.metadata.get("validation", {}).get("inputs_sha256"):
+                                previous = candidate
+                    # Timeout/crash records describe unfinished work, not a
+                    # reusable result. Retry them even when the signature matches.
             except (ValueError, KeyError, OSError):
                 pass
         if previous is not None:

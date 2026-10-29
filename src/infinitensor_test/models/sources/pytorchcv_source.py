@@ -22,13 +22,13 @@ def pytorchcv_specs(params):
         module = model_provider._models[name].__module__.rsplit(".", 1)[-1]
         task, category = "classification", ModelCategory.CLASSIFICATION
         if "pose" in module:
-            task, category = "pose_estimation", ModelCategory.OTHER
+            task, category = "pose_estimation", ModelCategory.POSE_ESTIMATION
         elif module in SEGMENTATION_MODULES:
             task, category = "segmentation", ModelCategory.SEGMENTATION
         elif module in ("lffd", "retinaface", "centernet"):
             task, category = "detection", ModelCategory.DETECTION
         elif module in ("jasper", "jasperdr", "quartznet", "wav2letter"):
-            task, category = "speech_recognition", ModelCategory.OTHER
+            task, category = "speech_recognition", ModelCategory.SPEECH_RECOGNITION
         elif "propainter" in module:
             task, category = "video_inpainting", ModelCategory.OTHER
         elif module == "voca":

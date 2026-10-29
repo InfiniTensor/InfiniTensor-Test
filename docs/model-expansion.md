@@ -77,6 +77,10 @@ infinitensor-test-expand --manifest catalogs/real-networks.json \
 
 `--resume` 仅在请求的源码、配置、来源库及验证环境签名相同时复用已完成任务记录，并检查成功模型包摘要。验证环境统一包含 Python、Torch、Torchvision、ONNX、ORT、NumPy 版本；源码签名也传入底层模型缓存，避免任务记录失效后继续复用旧模型和旧 PyTorch 比较证据。升级到审核修复版本后，旧缓存会失效并重新导出。
 
+成功记录还必须重新读取实际输入，校验名称、shape、dtype、有限值，并将全部数组摘要与保存的 `validation.inputs_sha256` 核对；NPZ 缺失、损坏或内容不符时交回正常 worker。输入合同生成的 NPZ 可由 worker 重建；显式外部输入仍无效时，记录输入或参考失败，不能沿用旧成功状态。等值数组重新打包 NPZ 不会引起重复执行。
+
+`timeout` 和 `crash` 是未完成任务，使用 `--resume` 时始终重新执行，可调大 `--timeout` 后继续，同时保留验证证据仍有效的成功项。签名不变的明确 `failed` / `excluded` 记录仍复用；需要重试这类已完成诊断时使用 `--force` 或不使用 `--resume`。
+
 `--resume` 适用于恢复一次被中断的探索；正式复验不使用该参数。采集器仍可复用相同验证签名下、模型包及输入摘要校验通过的参考验证缓存，初版 1347 项严格复验采用此方式；首次候选筛选逐项执行了导出与 PyTorch/ONNX 比较。需要重新导出和计算参考结果时增加 `--force`，该参数优先于 `--resume`。清单版本更新需要显式审查，不会自动修改仓库中的清单。
 
 若希望保留探索报告、同时复用模型缓存，可将复验输出放到另一个 data_dir，并设置绝对路径 `ITEST_MODELS_DIR` 指向原缓存目录。
@@ -115,4 +119,8 @@ infinitensor-test-expand --manifest catalogs/real-networks.json \
 
 整合 PR #2 的后续扩充时，另核对 75 个新增模型包，更新 4 个检测模型、2 个 Paddle 表格模型的子图指纹。4 个检测模型的新导出还将旧缓存的符号输出首维改为实际尺寸；逐项规范化图对照确认除此之外没有计算结构变化，输入摘要相同且全部输出比较通过，因此显式迁移对应指纹。集成验证为 170 项测试、原来源 3/3、多任务及检测 10/10、Paddle 5/5；通用 1409 项与 Paddle 13 项联合结构摘要仍为 1422 个唯一值。本轮没有全量重新导出这 1422 项。
 
+后续恢复逻辑审核修正了上述 NPZ 核对和未完成任务重试，同时将 PyTorchCV 姿态/语音网络映射至已有的 `pose_estimation` / `speech_recognition` 类别，使 `ModelCatalog.filter()` 和 collect/run 的类别筛选与 inventory 任务统计一致。清单中的任务、输入和结构未因此变化；原有 catalog 需要重新采集才能刷新类别。
+
 本功能增加可供 InfiniTensor 测试的有效网络集合，不保证这些网络都已被 InfiniTensor 支持。设备执行隔离、全部输出数值门禁与 CPU/GPU 支持基线仍按后续计划交付。
+
+本轮恢复与类别修复的验证范围及真实测试输出见[审核修复记录](resume-review.md)。
